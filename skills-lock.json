@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "d51e27d5228746d083a478bfe5038b4da0bf59275ebc5d7f1ccf9c525577715f"
+    },
+    "task-observer": {
+      "source": "rebelytics/one-skill-to-rule-them-all",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "3142799225f466573c279d1ec2c60fcf7a0b61aa8839f96f566941261baa72ca"
+    }
+  }
+}
