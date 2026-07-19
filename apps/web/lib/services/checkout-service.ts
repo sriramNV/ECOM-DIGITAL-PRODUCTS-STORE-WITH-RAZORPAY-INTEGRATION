@@ -5,6 +5,7 @@ import { cartRepo } from "@/lib/repositories/cart-repo";
 import { generateOrderNumber } from "@/lib/order-number";
 import { calculateSubtotal, calculateTax, calculateShipping, calculateTotal } from "./pricing-service";
 import { logger } from "@/lib/logger";
+import { fulfillmentService } from "./fulfillment-service";
 
 export const checkoutService = {
   async createRazorpayOrder(userId: string) {
@@ -108,6 +109,8 @@ export const checkoutService = {
     await cartRepo.clearCart(userId);
 
     logger.info({ orderId: order.id, orderNumber }, "Order created after payment");
+
+    fulfillmentService.submitOrder(order.id).catch(logger.error);
 
     return { id: order.id, orderNumber };
   },
