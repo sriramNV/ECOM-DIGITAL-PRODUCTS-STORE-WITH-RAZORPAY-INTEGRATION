@@ -180,7 +180,7 @@ export const productRepo = {
   },
 
   async getBySlug(slug: string) {
-    const product = await prisma.product.findUnique({
+    const product = await prisma.product.findFirst({
       where: { slug, isActive: true },
       include: {
         category: true,
@@ -200,7 +200,7 @@ export const productRepo = {
   },
 
   async getFeatured(limit = 8) {
-    return prisma.product.findMany({
+    const products = await prisma.product.findMany({
       where: { isActive: true, isFeatured: true },
       include: {
         category: { select: { name: true, slug: true } },
@@ -210,6 +210,13 @@ export const productRepo = {
       take: limit,
       orderBy: { createdAt: "desc" },
     });
+
+    return products.map((p) => ({
+      ...p,
+      basePrice: Number(p.basePrice),
+      marginPercent: Number(p.marginPercent),
+      variants: p.variants.map((v) => ({ ...v, price: Number(v.price) })),
+    }));
   },
 };
 ```

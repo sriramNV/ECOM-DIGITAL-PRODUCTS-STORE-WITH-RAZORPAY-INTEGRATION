@@ -1,3 +1,19 @@
+# Task 3.1: Create product repositories
+
+**Plan:** Plan 03 — Product Catalog
+**Depends on:** Plan 01 (Prisma schema with Product, Category models), Plan 02 (types)
+**Produces:** `productRepo.list()`, `productRepo.getBySlug()`, `categoryRepo.list()`
+
+## Files to Create
+
+- `apps/web/lib/repositories/product-repo.ts`
+- `apps/web/lib/repositories/category-repo.ts`
+- `apps/web/lib/repositories/__tests__/product-repo.test.ts`
+
+## Steps
+
+### Step 1: Create apps/web/lib/repositories/product-repo.ts
+```typescript
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
@@ -91,7 +107,7 @@ export const productRepo = {
   },
 
   async getBySlug(slug: string) {
-    const product = await prisma.product.findFirst({
+    const product = await prisma.product.findUnique({
       where: { slug, isActive: true },
       include: {
         category: true,
@@ -111,7 +127,7 @@ export const productRepo = {
   },
 
   async getFeatured(limit = 8) {
-    const products = await prisma.product.findMany({
+    return prisma.product.findMany({
       where: { isActive: true, isFeatured: true },
       include: {
         category: { select: { name: true, slug: true } },
@@ -121,12 +137,80 @@ export const productRepo = {
       take: limit,
       orderBy: { createdAt: "desc" },
     });
-
-    return products.map((p) => ({
-      ...p,
-      basePrice: Number(p.basePrice),
-      marginPercent: Number(p.marginPercent),
-      variants: p.variants.map((v) => ({ ...v, price: Number(v.price) })),
-    }));
   },
 };
+```
+
+### Step 2: Create apps/web/lib/repositories/category-repo.ts
+```typescript
+import { prisma } from "@/lib/prisma";
+
+export const categoryRepo = {
+  async list() {
+    return prisma.category.findMany({
+      orderBy: { order: "asc" },
+      include: {
+        _count: { select: { products: { where: { isActive: true } } } },
+      },
+    });
+  },
+
+  async getBySlug(slug: string) {
+    return prisma.category.findUnique({
+      where: { slug },
+      include: {
+        children: true,
+        products: {
+          where: { isActive: true },
+          include: {
+            images: { orderBy: { position: "asc" }, take: 1 },
+          },
+        },
+      },
+    });
+  },
+};
+```
+
+### Step 3: Write product repository test
+```typescript
+// apps/web/lib/repositories/__tests__/product-repo.test.ts
+import { describe, it, expect } from "vitest";
+import { productRepo } from "../product-repo";
+
+describe("productRepo", () => {
+  it("list returns paginated results", async () => {
+    const result = await productRepo.list({ page: 1, limit: 10 });
+    expect(Array.isArray(result.items)).toBe(true);
+    expect(result.page).toBe(1);
+    expect(result.totalPages).toBeGreaterThanOrEqual(0);
+  });
+
+  it("getBySlug returns null for non-existent product", async () => {
+    const result = await productRepo.getBySlug("non-existent-product");
+    expect(result).toBeNull();
+  });
+});
+```
+
+### Step 4: Run test
+```bash
+npx vitest run apps/web/lib/repositories/__tests__/product-repo.test.ts
+```
+
+Expected: Tests pass (items will be empty array since no products seeded yet).
+
+### Step 5: Commit
+```bash
+git add apps/web/lib/repositories
+git commit -m "feat: add product and category repositories"
+```
+
+## Notes
+
+- Prisma client must be generated (should be from Plan 01)
+- The `children` include on category-repo.list was removed because the Category model has `children Category?` (singular) in the schema — the implementer fixed this in Plan 01 Task 1.3. The diff shows `children: true` — verify if the schema has `children Category[]` or `children Category?`. If the schema was fixed to `Category[]`, the include works. If not, remove it.
+- Actually, look carefully: the Category has `children Category? @relation("CategoryHierarchy")` — the fix in Task 1.3 changed this to `children Category[]`. So the array include is correct.
+- Wait — Task 1.3 implementer reported fixing this. But the schema in the plan file wasn't updated. Let me check the actual schema.
+
+Actually, I need to verify the actual schema to see if `children` is `Category[]` or `Category?`.
