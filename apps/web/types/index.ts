@@ -12,18 +12,7 @@ export type OrderStatus =
 
 export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
-export type CartItem = {
-  id: string;
-  productId: string;
-  variantId: string;
-  title: string;
-  image: string;
-  price: number;
-  quantity: number;
-  size: string;
-  color: string;
-  slug: string;
-};
+export type { CartItem } from "./cart";
 
 export type Address = {
   name: string;
