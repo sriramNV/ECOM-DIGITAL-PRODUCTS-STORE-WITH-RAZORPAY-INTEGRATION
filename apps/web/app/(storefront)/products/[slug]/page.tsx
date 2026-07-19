@@ -66,6 +66,13 @@ export default async function ProductDetailPage({ params }: Props) {
 
           <AddToCartButton
             productId={product.id}
+            variantId={product.variants[0]?.id}
+            title={product.title}
+            image={product.images[0]?.url ?? ""}
+            price={Math.min(...product.variants.map((v) => v.price))}
+            size={product.variants[0]?.size ?? ""}
+            color={product.variants[0]?.color ?? ""}
+            slug={product.slug}
             disabled={product.variants.length === 0}
           />
 
