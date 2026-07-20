@@ -1,10 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { RazorpayButton } from "./razorpay-button";
+import { useCartStore } from "@/stores/cart-store";
 
 export function CheckoutForm() {
+  const setItems = useCartStore((s) => s.setItems);
+  const items = useCartStore((s) => s.items);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("pod-guest-cart");
+    if (stored && items.length === 0) {
+      try {
+        const guestItems = JSON.parse(stored);
+        if (Array.isArray(guestItems) && guestItems.length > 0) {
+          setItems(guestItems);
+        }
+      } catch { /* ignore */ }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [address, setAddress] = useState({
     fullName: "",
     email: "",

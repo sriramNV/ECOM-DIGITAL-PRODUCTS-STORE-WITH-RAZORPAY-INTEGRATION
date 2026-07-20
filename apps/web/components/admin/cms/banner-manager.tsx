@@ -122,11 +122,11 @@ export function BannerManager() {
         <DataTable
           columns={[
             { header: "Title", accessorKey: "title" },
-            { header: "Position", accessorKey: "position", cell: (v: string) => <Badge variant="secondary">{v}</Badge> },
-            { header: "Active", accessorKey: "isActive", cell: (v: boolean) => v ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge> },
+            { header: "Position", accessorKey: "position", cell: (v: unknown) => <Badge variant="secondary">{v as string}</Badge> },
+            { header: "Active", accessorKey: "isActive", cell: (v: unknown) => v ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge> },
             { header: "Order", accessorKey: "order" },
-            { header: "Start", accessorKey: "startDate", cell: (v: string | null) => v ? formatDate(v) : "-" },
-            { header: "End", accessorKey: "endDate", cell: (v: string | null) => v ? formatDate(v) : "-" },
+            { header: "Start", accessorKey: "startDate", cell: (v: unknown) => v ? formatDate(v as string) : "-" },
+            { header: "End", accessorKey: "endDate", cell: (v: unknown) => v ? formatDate(v as string) : "-" },
           ]}
           data={banners ?? []}
           onRowClick={(row: Banner) => {

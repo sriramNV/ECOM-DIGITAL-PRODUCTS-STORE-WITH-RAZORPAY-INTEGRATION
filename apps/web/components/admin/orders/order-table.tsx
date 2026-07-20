@@ -119,7 +119,7 @@ export function OrderTable() {
                 cell: (value: unknown) => formatDate(value as string),
               },
             ]}
-            data={orders as unknown as Record<string, unknown>[]}
+            data={orders}
             onRowClick={(row: Order) => `/admin/orders/${row.id}`}
           />
           <div className="flex items-center justify-between mt-4 text-sm text-foreground-muted">

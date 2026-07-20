@@ -19,11 +19,11 @@ export const cmsRepo = {
   },
 
   async createPage(data: { title: string; slug: string; content?: unknown }) {
-    return prisma.page.create({ data });
+    return prisma.page.create({ data: data as any });
   },
 
   async updatePage(id: string, data: { title?: string; content?: unknown; seoTitle?: string; seoDesc?: string; isPublished?: boolean }) {
-    return prisma.page.update({ where: { id }, data });
+    return prisma.page.update({ where: { id }, data: data as any });
   },
 
   async listBanners(page = 1, limit = 20) {

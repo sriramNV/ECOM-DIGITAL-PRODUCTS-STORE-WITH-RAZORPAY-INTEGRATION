@@ -1,4 +1,4 @@
-import { Queue } from "bull";
+import Queue from "bull";
 import { prisma } from "@/lib/prisma";
 import { emailService } from "@/lib/services/email-service";
 import { logger } from "@/lib/logger";

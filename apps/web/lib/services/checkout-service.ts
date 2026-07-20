@@ -161,7 +161,7 @@ export const checkoutService = {
         discountAmount: discount,
         couponId: appliedCouponId,
         currency: "INR",
-        shippingAddress: sanitizedAddress,
+        shippingAddress: sanitizedAddress as any,
         payments: {
           create: {
             razorpayPaymentId: paymentId,

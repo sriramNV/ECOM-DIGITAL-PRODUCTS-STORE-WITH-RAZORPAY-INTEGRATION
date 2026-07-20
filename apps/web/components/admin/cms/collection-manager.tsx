@@ -105,8 +105,8 @@ export function CollectionManager() {
           columns={[
             { header: "Name", accessorKey: "name" },
             { header: "Slug", accessorKey: "slug" },
-            { header: "Status", accessorKey: "isActive", cell: (v: boolean) => v ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge> },
-            { header: "Created", accessorKey: "createdAt", cell: (v: string) => formatDate(v) },
+            { header: "Status", accessorKey: "isActive", cell: (v: unknown) => v ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge> },
+            { header: "Created", accessorKey: "createdAt", cell: (v: unknown) => formatDate(v as string) },
           ]}
           data={collections ?? []}
           onRowClick={(row: Collection) => {

@@ -47,10 +47,10 @@ export function CustomerTable({ customers }: Props) {
   ];
 
   return (
-    <DataTable
+    <DataTable<Customer>
       columns={columns}
-      data={customers as unknown as Record<string, unknown>[]}
-      onRowClick={(row) => `/admin/customers/${(row as unknown as Customer).id}`}
+      data={customers}
+      onRowClick={(row) => `/admin/customers/${row.id}`}
     />
   );
 }

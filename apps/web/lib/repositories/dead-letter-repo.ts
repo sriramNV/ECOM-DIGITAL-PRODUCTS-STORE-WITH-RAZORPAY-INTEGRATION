@@ -7,7 +7,7 @@ export const deadLetterRepo = {
         action: "fulfillment_failed",
         entity: "order",
         entityId: orderId,
-        metadata: { error, context },
+        metadata: { error, context } as any,
       },
     });
   },

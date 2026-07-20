@@ -46,12 +46,12 @@ export function CouponTable() {
         <DataTable
           columns={[
             { header: "Code", accessorKey: "code" },
-            { header: "Type", accessorKey: "type", cell: (v: string) => v.replace("_", " ") },
+            { header: "Type", accessorKey: "type", cell: (v: unknown) => (v as string).replace("_", " ") },
             { header: "Value", accessorKey: "value", cell: (_: unknown, row: Coupon) =>
               row.type === "percentage" ? `${row.value}%` : formatCurrency(row.value)
             },
-            { header: "Active", accessorKey: "isActive", cell: (v: boolean) => v ? "Yes" : "No" },
-            { header: "Created", accessorKey: "createdAt", cell: (v: string) => formatDate(v) },
+            { header: "Active", accessorKey: "isActive", cell: (v: unknown) => v ? "Yes" : "No" },
+            { header: "Created", accessorKey: "createdAt", cell: (v: unknown) => formatDate(v as string) },
           ]}
           data={(coupons ?? []) as Coupon[]}
         />

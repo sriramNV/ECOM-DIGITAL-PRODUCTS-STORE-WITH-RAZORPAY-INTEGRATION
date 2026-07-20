@@ -31,9 +31,9 @@ export function ProductTable() {
         <DataTable
           columns={[
             { header: "Title", accessorKey: "title" },
-            { header: "Price", accessorKey: "basePrice", cell: (v: number) => formatCurrency(v) },
-            { header: "Status", accessorKey: "isActive", cell: (v: boolean) => v ? "Active" : "Draft" },
-            { header: "Created", accessorKey: "createdAt", cell: (v: string) => formatDate(v) },
+            { header: "Price", accessorKey: "basePrice", cell: (v: unknown) => formatCurrency(v as number) },
+            { header: "Status", accessorKey: "isActive", cell: (v: unknown) => v ? "Active" : "Draft" },
+            { header: "Created", accessorKey: "createdAt", cell: (v: unknown) => formatDate(v as string) },
           ]}
           data={data?.items ?? []}
           onRowClick={(row: { slug: string }) => `/admin/products/${row.slug}`}

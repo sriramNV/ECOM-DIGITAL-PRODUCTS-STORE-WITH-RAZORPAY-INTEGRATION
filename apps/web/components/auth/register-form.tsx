@@ -29,6 +29,7 @@ export function RegisterForm() {
       name: form.get("name") as string,
       email: form.get("email") as string,
       password,
+    };
 
     const res = await fetch("/api/auth/register", {
       method: "POST",

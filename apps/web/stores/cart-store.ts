@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartItem } from "@/types";
 
+// Cart item IDs use the format `${productId}::${variantId}` (double colon separator)
+// to prevent collision between product IDs and variant IDs.
+
 type CartStore = {
   items: CartItem[];
   addItem: (item: CartItem) => void;

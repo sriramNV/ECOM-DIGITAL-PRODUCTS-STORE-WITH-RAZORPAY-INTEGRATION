@@ -16,9 +16,9 @@ export function RecentOrders() {
         columns={[
           { header: "Order", accessorKey: "orderNumber" },
           { header: "Customer", accessorKey: "customerName" },
-          { header: "Total", accessorKey: "totalAmount", cell: (v: number) => formatCurrency(v) },
-          { header: "Status", accessorKey: "status", cell: (v: string) => <OrderStatusBadge status={v} /> },
-          { header: "Date", accessorKey: "createdAt", cell: (v: string) => formatDate(v) },
+          { header: "Total", accessorKey: "totalAmount", cell: (v: unknown) => formatCurrency(v as number) },
+          { header: "Status", accessorKey: "status", cell: (v: unknown) => <OrderStatusBadge status={v as string} /> },
+          { header: "Date", accessorKey: "createdAt", cell: (v: unknown) => formatDate(v as string) },
         ]}
         data={data?.items ?? []}
       />

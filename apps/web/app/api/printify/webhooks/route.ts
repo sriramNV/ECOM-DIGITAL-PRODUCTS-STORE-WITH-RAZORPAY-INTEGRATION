@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     await fulfillmentService.handleWebhook(event, signature, body);
 
-    await redis.set(`printify-webhook:${eventId}`, "1", { EX: 86400 });
+    await redis.set(`printify-webhook:${eventId}`, "1", "EX", 86400);
 
     return NextResponse.json({ status: "ok" });
   } catch (error) {

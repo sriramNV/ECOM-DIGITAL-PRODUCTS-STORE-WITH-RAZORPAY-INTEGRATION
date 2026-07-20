@@ -138,8 +138,8 @@ export function PageEditor() {
           columns={[
             { header: "Title", accessorKey: "title" },
             { header: "Slug", accessorKey: "slug" },
-            { header: "Status", accessorKey: "isPublished", cell: (v: boolean) => v ? "Published" : "Draft" },
-            { header: "Updated", accessorKey: "updatedAt", cell: (v: string) => formatDate(v) },
+            { header: "Status", accessorKey: "isPublished", cell: (v: unknown) => v ? "Published" : "Draft" },
+            { header: "Updated", accessorKey: "updatedAt", cell: (v: unknown) => formatDate(v as string) },
           ]}
           data={pages ?? []}
           onRowClick={(row: Page) => {

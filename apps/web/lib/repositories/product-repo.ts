@@ -81,7 +81,7 @@ export const productRepo = {
         isFeatured: item.isFeatured,
         category: item.category,
         images: item.images.map((img) => ({ url: img.url, alt: img.alt })),
-        variants: item.variants,
+        variants: item.variants.map((v) => ({ ...v, price: Number(v.price) })),
         createdAt: item.createdAt,
       })),
       total,
