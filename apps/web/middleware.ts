@@ -1,10 +1,30 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+async function rateLimit(ip: string, maxRequests: number, windowMs: number): Promise<boolean> {
+  try {
+    const { redis } = await import("@/lib/redis");
+    const key = `ratelimit:${ip}`;
+    const current = await redis.incr(key);
+    if (current === 1) await redis.expire(key, Math.floor(windowMs / 1000));
+    return current <= maxRequests;
+  } catch {
+    return true;
+  }
+}
+
+export default auth(async (req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
   const isAdmin = req.auth?.user?.role === "ADMIN";
+
+  if (pathname.startsWith("/api/")) {
+    const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+    const allowed = await rateLimit(ip, 100, 60000);
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
 
   if (pathname.startsWith("/admin") && !isLoggedIn) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -26,5 +46,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/login", "/register"],
+  matcher: ["/api/:path*", "/admin/:path*", "/account/:path*", "/login", "/register"],
 };
