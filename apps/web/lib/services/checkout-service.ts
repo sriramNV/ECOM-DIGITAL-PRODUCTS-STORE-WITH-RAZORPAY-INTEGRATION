@@ -10,7 +10,7 @@ import { fulfillmentService } from "./fulfillment-service";
 import { emailService } from "./email-service";
 
 export const checkoutService = {
-  async createRazorpayOrder(userId: string, couponCode?: string) {
+  async createRazorpayOrder(userId: string, couponCode?: string, shippingAddress?: Record<string, unknown>) {
     const cart = await cartRepo.getByUserId(userId);
     if (!cart || cart.items.length === 0) {
       throw new Error("Cart is empty");
@@ -39,11 +39,14 @@ export const checkoutService = {
     const total = calculateTotal(subtotal, shipping, tax, discount);
     const amountInPaise = Math.round(total * 100);
 
+    const notes: Record<string, string> = { userId, expectedAmount: String(total) };
+    if (couponCode) notes.couponCode = couponCode;
+
     const rzpOrder = await razorpay.orders.create({
       amount: amountInPaise,
       currency: "INR",
       receipt: `cart_${cart.id}`,
-      notes: { userId },
+      notes,
     });
 
     return {
@@ -71,6 +74,16 @@ export const checkoutService = {
       throw new Error("Cart is empty");
     }
 
+    const existingPayment = await prisma.payment.findUnique({
+      where: { razorpayPaymentId: paymentId }
+    });
+    if (existingPayment) {
+      const order = await prisma.order.findUnique({
+        where: { id: existingPayment.orderId }
+      });
+      if (order) return { id: order.id, orderNumber: order.orderNumber };
+    }
+
     const items = cart.items.map((i) => ({
       unitPrice: Number(i.variant.price),
       quantity: i.quantity,
@@ -93,6 +106,12 @@ export const checkoutService = {
     }
 
     const total = calculateTotal(subtotal, shipping, tax, discount);
+
+    const rzpOrder = await razorpay.orders.fetch(orderId);
+    const expectedAmount = rzpOrder.notes?.expectedAmount;
+    if (expectedAmount !== undefined && Number(expectedAmount) !== total) {
+      throw new Error("Payment amount mismatch - possible tampering detected");
+    }
 
     // Remove couponCode from stored address to avoid leaking internal fields
     const { couponCode: _, ...cleanAddress } = (shippingAddress ?? {}) as Record<string, unknown>;

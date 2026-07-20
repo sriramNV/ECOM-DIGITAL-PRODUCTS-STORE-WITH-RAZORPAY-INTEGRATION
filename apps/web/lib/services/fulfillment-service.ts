@@ -70,7 +70,10 @@ export const fulfillmentService = {
       .update(rawBody)
       .digest("hex");
 
-    if (signature !== expected) {
+    const sigBuffer = Buffer.from(signature, "hex");
+    const expectedBuffer = Buffer.from(expected, "hex");
+    const safe = sigBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+    if (!safe) {
       throw new Error("Invalid Printify webhook signature");
     }
 

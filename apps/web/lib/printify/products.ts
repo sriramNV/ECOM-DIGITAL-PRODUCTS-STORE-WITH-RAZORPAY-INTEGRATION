@@ -2,6 +2,7 @@ import { printifyClient } from "./client";
 import type { PrintifyProduct } from "./types";
 
 const SHOP_ID = process.env.PRINTIFY_SHOP_ID;
+if (!SHOP_ID) throw new Error("PRINTIFY_SHOP_ID environment variable is not configured");
 
 export const printifyProducts = {
   async list() {

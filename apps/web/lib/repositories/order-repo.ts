@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
+type OrderStatus = "PENDING_PAYMENT" | "PAID" | "PROCESSING" | "PRINTING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "REFUNDED";
+
 export const orderRepo = {
   async getById(id: string) {
     return prisma.order.findUnique({
@@ -34,7 +36,7 @@ export const orderRepo = {
     const skip = (page - 1) * limit;
 
     const where: Prisma.OrderWhereInput = {};
-    if (status) where.status = status as any;
+    if (status) where.status = status as OrderStatus;
     if (search) {
       where.OR = [
         { orderNumber: { contains: search, mode: "insensitive" } },
@@ -59,11 +61,11 @@ export const orderRepo = {
   async updateStatus(id: string, status: string, note?: string) {
     const order = await prisma.order.update({
       where: { id },
-      data: { status: status as any },
+      data: { status: status as OrderStatus },
     });
 
     await prisma.orderStatusHistory.create({
-      data: { orderId: id, status: status as any, note },
+      data: { orderId: id, status: status as OrderStatus, note },
     });
 
     return order;

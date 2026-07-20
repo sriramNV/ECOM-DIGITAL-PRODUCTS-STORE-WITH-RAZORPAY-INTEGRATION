@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const result = await checkoutService.createRazorpayOrder(session.user.id, body.couponCode);
+    const result = await checkoutService.createRazorpayOrder(session.user.id, body.couponCode, body.shippingAddress);
     return NextResponse.json(result);
   } catch (error) {
     logger.error({ error }, "Failed to create Razorpay order");
