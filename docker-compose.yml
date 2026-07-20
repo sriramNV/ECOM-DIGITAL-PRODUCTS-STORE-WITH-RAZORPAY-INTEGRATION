@@ -13,10 +13,19 @@ services:
       - REDIS_PORT=6379
       - MINIO_ENDPOINT=minio
       - WATCHPACK_POLLING=true
+      - NODE_PATH=/app/apps/web/node_modules
+      - PRISMA_GENERATE_SKIP_AUTOINSTALL=1
     volumes:
-      - ./apps/web:/app/apps/web
-      - ./packages/shared:/app/packages/shared
+      - ./apps/web/app:/app/apps/web/app
+      - ./apps/web/public:/app/apps/web/public
+      - ./apps/web/next.config.ts:/app/apps/web/next.config.ts
+      - ./apps/web/tsconfig.json:/app/apps/web/tsconfig.json
+      - ./apps/web/postcss.config.mjs:/app/apps/web/postcss.config.mjs
+      - ./apps/web/package.json:/app/apps/web/package.json
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/shared/package.json:/app/packages/shared/package.json
       - /app/node_modules
+      - /app/apps/web/node_modules
       - /app/apps/web/.next
     depends_on:
       postgres: { condition: service_healthy }

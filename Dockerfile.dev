@@ -2,16 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+RUN apk add --no-cache openssl libcrypto3 libssl3 && corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 COPY . .
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "web", "dev"]
+CMD ["sh", "-c", "/app/node_modules/.bin/prisma generate --schema=/app/prisma/schema.prisma 2>/dev/null; /app/node_modules/.bin/prisma migrate deploy --schema=/app/prisma/schema.prisma 2>/dev/null; cd apps/web && pnpm exec next dev"]
