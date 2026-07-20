@@ -4,11 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { cartRepo } from "@/lib/repositories/cart-repo";
 import { generateOrderNumber } from "@/lib/order-number";
 import { calculateSubtotal, calculateTax, calculateShipping, calculateTotal } from "./pricing-service";
+import { couponService } from "./coupon-service";
 import { logger } from "@/lib/logger";
 import { fulfillmentService } from "./fulfillment-service";
 
 export const checkoutService = {
-  async createRazorpayOrder(userId: string) {
+  async createRazorpayOrder(userId: string, couponCode?: string) {
     const cart = await cartRepo.getByUserId(userId);
     if (!cart || cart.items.length === 0) {
       throw new Error("Cart is empty");
@@ -22,7 +23,19 @@ export const checkoutService = {
     const subtotal = calculateSubtotal(items);
     const shipping = calculateShipping(subtotal);
     const tax = calculateTax(subtotal);
-    const total = calculateTotal(subtotal, shipping, tax);
+
+    let discount = 0;
+    let appliedCouponId: string | undefined;
+    if (couponCode) {
+      const result = await couponService.validateAndApply(couponCode, subtotal, userId);
+      if (result.valid) {
+        discount = result.discount;
+        const coupon = await prisma.coupon.findUnique({ where: { code: result.code } });
+        appliedCouponId = coupon?.id;
+      }
+    }
+
+    const total = calculateTotal(subtotal, shipping, tax, discount);
     const amountInPaise = Math.round(total * 100);
 
     const rzpOrder = await razorpay.orders.create({
@@ -37,6 +50,8 @@ export const checkoutService = {
       amount: total,
       amountInPaise,
       currency: "INR",
+      discount,
+      couponCode: appliedCouponId ? couponCode : undefined,
     };
   },
 
@@ -63,7 +78,23 @@ export const checkoutService = {
     const subtotal = calculateSubtotal(items);
     const shipping = calculateShipping(subtotal);
     const tax = calculateTax(subtotal);
-    const total = calculateTotal(subtotal, shipping, tax);
+
+    const couponCode = shippingAddress?.couponCode as string | undefined;
+    let discount = 0;
+    let appliedCouponId: string | undefined;
+    if (couponCode) {
+      const result = await couponService.validateAndApply(couponCode, subtotal, userId);
+      if (result.valid) {
+        discount = result.discount;
+        const coupon = await prisma.coupon.findUnique({ where: { code: result.code } });
+        appliedCouponId = coupon?.id;
+      }
+    }
+
+    const total = calculateTotal(subtotal, shipping, tax, discount);
+
+    // Remove couponCode from stored address to avoid leaking internal fields
+    const { couponCode: _, ...cleanAddress } = (shippingAddress ?? {}) as Record<string, unknown>;
 
     const orderNumber = await generateOrderNumber();
 
@@ -77,8 +108,10 @@ export const checkoutService = {
         shippingAmount: shipping,
         taxAmount: tax,
         taxRate: 18,
+        discountAmount: discount,
+        couponId: appliedCouponId,
         currency: "INR",
-        shippingAddress,
+        shippingAddress: cleanAddress,
         payments: {
           create: {
             razorpayPaymentId: paymentId,
