@@ -1,0 +1,14 @@
+node_modules
+.git
+.next
+*.md
+.env
+.env.local
+.env.production
+Dockerfile
+docker-compose*.yml
+.gitignore
+.pnp
+.pnp.js
+coverage
+dist

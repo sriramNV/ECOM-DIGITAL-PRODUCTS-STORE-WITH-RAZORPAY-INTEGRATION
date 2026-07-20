@@ -1,4 +1,28 @@
 services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: pod-web
+    ports: ["3000:3000"]
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://pod:password@postgres:5432/pod
+      - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages/shared:/app/packages/shared
+      - /app/node_modules
+      - /app/apps/web/.next
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: pod-postgres
