@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { orderRepo } from "@/lib/repositories/order-repo";
 import { fulfillmentService } from "@/lib/services/fulfillment-service";
+import { adminGuard } from "@/lib/admin-guard";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const guard = await adminGuard();
+  if (guard) return guard;
   const order = await orderRepo.getById(params.id);
   if (!order) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -17,6 +20,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const guard = await adminGuard();
+  if (guard) return guard;
   const { action } = await request.json();
 
   const order = await orderRepo.getById(params.id);

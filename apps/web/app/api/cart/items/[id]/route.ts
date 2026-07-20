@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { cartRepo } from "@/lib/repositories/cart-repo";
+import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
   _request: Request,
@@ -12,6 +12,17 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  await cartRepo.removeItem(id);
+
+  const cart = await prisma.cart.findUnique({ where: { userId: session.user.id } });
+  if (!cart) {
+    return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+  }
+
+  const item = await prisma.cartItem.findFirst({ where: { id, cartId: cart.id } });
+  if (!item) {
+    return NextResponse.json({ error: "Item not found" }, { status: 404 });
+  }
+
+  await prisma.cartItem.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { adminGuard } from "@/lib/admin-guard";
 
 let pendingSettings: Record<string, string> = {};
 
 export async function GET() {
+  const guard = await adminGuard();
+  if (guard) return guard;
   return NextResponse.json({
     appName: pendingSettings.appName ?? process.env.NEXT_PUBLIC_APP_NAME ?? "POD Store",
     currency: pendingSettings.currency ?? process.env.NEXT_PUBLIC_CURRENCY ?? "INR",
@@ -12,6 +15,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const guard = await adminGuard();
+  if (guard) return guard;
   const body = await request.json();
   const allowed = ["appName", "currency", "supportEmail", "itemsPerPage"];
   for (const key of allowed) {

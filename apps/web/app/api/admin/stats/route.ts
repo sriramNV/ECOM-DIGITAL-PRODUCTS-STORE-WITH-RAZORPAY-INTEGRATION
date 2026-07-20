@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { adminGuard } from "@/lib/admin-guard";
 
 export async function GET() {
+  const guard = await adminGuard();
+  if (guard) return guard;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { couponRepo } from "@/lib/repositories/coupon-repo";
+import { adminGuard } from "@/lib/admin-guard";
 
 export async function GET() {
   const coupons = await couponRepo.list();
@@ -7,6 +8,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = await adminGuard();
+  if (guard) return guard;
   const data = await request.json();
   const coupon = await couponRepo.create({
     code: data.code,

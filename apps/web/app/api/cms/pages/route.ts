@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cmsRepo } from "@/lib/repositories/cms-repo";
 import { logger } from "@/lib/logger";
+import { adminGuard } from "@/lib/admin-guard";
 
 export async function GET() {
   try {
@@ -13,6 +14,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = await adminGuard();
+  if (guard) return guard;
   try {
     const data = await request.json();
     const page = await cmsRepo.createPage(data);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cmsRepo } from "@/lib/repositories/cms-repo";
 import { logger } from "@/lib/logger";
+import { adminGuard } from "@/lib/admin-guard";
 
 export async function GET(
   _request: NextRequest,
@@ -25,6 +26,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await adminGuard();
+  if (guard) return guard;
   try {
     const { id } = await params;
     const data = await request.json();
