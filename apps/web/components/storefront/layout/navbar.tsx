@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MobileMenu } from "@/components/storefront/layout/mobile-menu";
+import { useCartStore } from "@/stores/cart-store";
+import { useState } from "react";
 
 export function Navbar() {
   const { data: session } = useSession();
+  const cartCount = useCartStore((s) => s.items.length);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border h-16">
@@ -28,8 +33,12 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-4">
+          <button onClick={() => setMobileOpen(true)} className="md:hidden p-2">
+            <Menu className="h-5 w-5" />
+          </button>
           <Link href="/cart" className="relative">
             <ShoppingCart className="h-5 w-5 text-foreground-muted hover:text-foreground" />
+            {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">{cartCount}</span>}
           </Link>
 
           {session ? (
@@ -53,6 +62,7 @@ export function Navbar() {
           )}
         </div>
       </div>
+      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
     </header>
   );
 }

@@ -54,6 +54,10 @@ export function CouponForm({ open, onClose }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (endDate && new Date(endDate) < new Date(startDate)) {
+      alert("End date must be on or after the start date.");
+      return;
+    }
     mutation.mutate({
       code,
       type,

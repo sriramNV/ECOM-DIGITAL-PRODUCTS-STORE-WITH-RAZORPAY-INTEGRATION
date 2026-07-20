@@ -4,9 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Props = { content?: Record<string, unknown> };
-
-export function NewsletterBlock(_props: Props) {
+export function NewsletterBlock() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 

@@ -7,7 +7,7 @@ import { OrderStatusBadge } from "@/components/admin/orders/order-status-badge";
 export function RecentOrders() {
   const { data } = useQuery({
     queryKey: ["admin-recent-orders"],
-    queryFn: () => fetch("/api/admin/orders?limit=5&status=PAID").then(r => r.json()),
+    queryFn: () => fetch("/api/admin/orders?limit=5").then(r => r.json()),
   });
   return (
     <div className="rounded-lg border border-border bg-surface p-4">

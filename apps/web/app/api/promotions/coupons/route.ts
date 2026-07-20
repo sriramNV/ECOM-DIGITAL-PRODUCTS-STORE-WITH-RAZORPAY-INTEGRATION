@@ -4,10 +4,13 @@ import { adminGuard } from "@/lib/admin-guard";
 import { handleApiError } from "@/lib/api-error-handler";
 import { validateBody, couponCreateSchema } from "@/lib/schemas";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const coupons = await couponRepo.list();
-    return NextResponse.json(coupons);
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") ?? "1", 10);
+    const limit = parseInt(searchParams.get("limit") ?? "20", 10);
+    const result = await couponRepo.list(page, limit);
+    return NextResponse.json(result);
   } catch (error) {
     return handleApiError(error, "promotions/coupons GET");
   }

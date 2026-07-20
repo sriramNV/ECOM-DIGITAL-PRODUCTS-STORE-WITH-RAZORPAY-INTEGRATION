@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
 
 export const cmsRepo = {
-  async listPages() {
-    return prisma.page.findMany({ orderBy: { updatedAt: "desc" } });
+  async listPages(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [pages, total] = await Promise.all([
+      prisma.page.findMany({ orderBy: { updatedAt: "desc" }, skip, take: limit }),
+      prisma.page.count(),
+    ]);
+    return { pages, total, page, totalPages: Math.ceil(total / limit) };
   },
 
   async getPage(id: string) {
@@ -21,8 +26,13 @@ export const cmsRepo = {
     return prisma.page.update({ where: { id }, data });
   },
 
-  async listBanners() {
-    return prisma.banner.findMany({ orderBy: { order: "asc" } });
+  async listBanners(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [banners, total] = await Promise.all([
+      prisma.banner.findMany({ orderBy: { order: "asc" }, skip, take: limit }),
+      prisma.banner.count(),
+    ]);
+    return { banners, total, page, totalPages: Math.ceil(total / limit) };
   },
 
   async listActiveBanners() {

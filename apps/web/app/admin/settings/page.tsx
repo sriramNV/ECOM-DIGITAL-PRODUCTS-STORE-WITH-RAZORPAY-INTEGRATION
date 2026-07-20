@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,11 +33,17 @@ export default function SettingsPage() {
     },
   });
 
+  useEffect(() => {
+    if (settings && !form) setForm(settings);
+  }, [settings, form]);
+
   if (isLoading || !settings) {
     return <p className="text-foreground-muted py-8 text-center">Loading…</p>;
   }
 
-  const current = form ?? settings;
+  if (!form) return null;
+
+  const current = form;
 
   return (
     <div className="max-w-xl space-y-6">

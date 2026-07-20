@@ -12,7 +12,14 @@ type Props = {
 };
 
 export function ProductGrid({ products }: Props) {
-  if (products.length === 0) return null;
+  if (products.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-foreground-muted text-lg">No products found</p>
+        <p className="text-foreground-muted text-sm mt-2">Try browsing a different category or check back later.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">

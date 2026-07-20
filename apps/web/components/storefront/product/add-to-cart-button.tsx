@@ -24,7 +24,7 @@ export function AddToCartButton({ productId, variantId, title, image, price, siz
     if (!variantId) return;
 
     addItem({
-      id: `${productId}-${variantId}`,
+      id: `${productId}::${variantId}`,
       productId,
       variantId,
       title,

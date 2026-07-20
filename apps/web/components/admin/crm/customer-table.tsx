@@ -34,9 +34,9 @@ export function CustomerTable({ customers }: Props) {
       header: "Last Order",
       accessorKey: "orders",
       cell: (value: unknown) => {
-        const orders = value as { totalAmount: number; createdAt: string }[];
+        const orders = value as { createdAt: string }[];
         if (!orders || orders.length === 0) return "—";
-        return <>₹{Number(orders[0].totalAmount).toLocaleString()}</>;
+        return <>{new Date(orders[0].createdAt).toLocaleDateString()}</>;
       },
     },
     {

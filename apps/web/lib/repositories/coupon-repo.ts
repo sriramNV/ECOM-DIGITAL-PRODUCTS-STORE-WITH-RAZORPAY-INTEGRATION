@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
 
 export const couponRepo = {
-  async list() {
-    return prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
+  async list(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [coupons, total] = await Promise.all([
+      prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, skip, take: limit }),
+      prisma.coupon.count(),
+    ]);
+    return { coupons, total, page, totalPages: Math.ceil(total / limit) };
   },
 
   async getByCode(code: string) {

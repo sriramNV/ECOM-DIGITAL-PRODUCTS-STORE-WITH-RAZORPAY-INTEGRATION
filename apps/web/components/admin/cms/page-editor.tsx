@@ -130,7 +130,7 @@ export function PageEditor() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-12 bg-surface rounded animate-pulse" />
+            <div key={`skeleton-${i}`} className="h-12 bg-surface rounded animate-pulse" />
           ))}
         </div>
       ) : (
@@ -213,13 +213,17 @@ export function PageEditor() {
                 ) : (
                   blocks.map((block, i) => (
                     <div
-                      key={i}
+                      key={`${block.type}-${i}`}
                       className="flex items-center justify-between p-3 border border-border rounded-lg bg-surface"
                     >
                       <div>
                         <span className="text-sm font-medium capitalize">{block.type}</span>
                         <p className="text-xs text-foreground-muted truncate max-w-60">
-                          {JSON.stringify(block.content)}
+                          {Object.keys(block.content).length > 0
+                            ? Object.entries(block.content)
+                                .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+                                .join(", ")
+                            : "No content"}
                         </p>
                       </div>
                       <button

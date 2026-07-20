@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { useCartStore } from "@/stores/cart-store";
 import { CartItemRow } from "./cart-item-row";
@@ -15,10 +16,16 @@ type Props = {
 export function CartDrawer({ open, onClose }: Props) {
   const items = useCartStore((s) => s.items);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
     <>
       {open && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Shopping cart">
           <div className="absolute inset-0 bg-black/40" onClick={onClose} />
           <div className="absolute right-0 top-0 h-full w-full max-w-md bg-background shadow-xl flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">

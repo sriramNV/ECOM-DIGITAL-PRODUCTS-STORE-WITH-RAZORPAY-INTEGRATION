@@ -10,7 +10,9 @@ export const categoryRepo = {
     });
   },
 
-  async getBySlug(slug: string) {
+  async getBySlug(slug: string, page = 1) {
+    const limit = 20;
+    const skip = (page - 1) * limit;
     return prisma.category.findUnique({
       where: { slug },
       include: {
@@ -20,6 +22,8 @@ export const categoryRepo = {
           include: {
             images: { orderBy: { position: "asc" }, take: 1 },
           },
+          skip,
+          take: limit,
         },
       },
     });

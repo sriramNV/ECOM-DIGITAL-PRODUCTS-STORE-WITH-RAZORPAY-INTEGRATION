@@ -40,6 +40,7 @@ export function OrderTable() {
   const limit = 20;
 
   useEffect(() => {
+    const abortController = new AbortController();
     setLoading(true);
     const params = new URLSearchParams();
     params.set("limit", String(limit));
@@ -47,7 +48,7 @@ export function OrderTable() {
     if (status) params.set("status", status);
     if (search) params.set("search", search);
 
-    fetch(`/api/admin/orders?${params.toString()}`)
+    fetch(`/api/admin/orders?${params.toString()}`, { signal: abortController.signal })
       .then((res) => res.json())
       .then((data) => {
         setOrders(data.items ?? []);
@@ -55,6 +56,8 @@ export function OrderTable() {
         setTotalPages(data.totalPages ?? 1);
       })
       .finally(() => setLoading(false));
+
+    return () => abortController.abort();
   }, [page, status, search]);
 
   return (

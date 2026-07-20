@@ -34,13 +34,13 @@ export function AuditLogViewer() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["audit-logs", page, action, search],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("limit", String(limit));
       if (action) params.set("action", action);
       if (search) params.set("entity", search);
-      const res = await fetch(`/api/logs/audit?${params.toString()}`);
+      const res = await fetch(`/api/logs/audit?${params.toString()}`, { signal });
       return res.json() as Promise<{
         items: AuditEntry[];
         total: number;
