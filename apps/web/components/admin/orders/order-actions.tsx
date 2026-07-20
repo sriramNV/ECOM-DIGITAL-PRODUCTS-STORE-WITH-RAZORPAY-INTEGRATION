@@ -15,11 +15,19 @@ export function OrderActions({ orderId, status }: Props) {
 
   async function handleAction(action: string) {
     setLoading(action);
-    await fetch(`/api/admin/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Failed to update order");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update order");
+    }
     setLoading(null);
     router.refresh();
   }

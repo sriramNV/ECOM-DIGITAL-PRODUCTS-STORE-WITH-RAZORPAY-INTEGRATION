@@ -15,9 +15,10 @@ declare global {
 type Props = {
   shippingAddress: Record<string, unknown>;
   disabled?: boolean;
+  couponCode?: string;
 };
 
-export function RazorpayButton({ shippingAddress, disabled }: Props) {
+export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clearCart);
@@ -33,7 +34,14 @@ export function RazorpayButton({ shippingAddress, disabled }: Props) {
     setError(null);
 
     try {
-      const res = await fetch("/api/razorpay/create-order", { method: "POST" });
+      const res = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shippingAddress,
+          couponCode,
+        }),
+      });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Failed to create order");

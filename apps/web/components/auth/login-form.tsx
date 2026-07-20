@@ -34,7 +34,13 @@ export function LoginForm() {
 
     // Merge guest cart into DB cart on login
     try {
-      await fetch("/api/cart/merge", { method: "POST" });
+      const guestCart = JSON.parse(localStorage.getItem("guest-cart") ?? "[]");
+      await fetch("/api/cart/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: guestCart }),
+      });
+      localStorage.removeItem("guest-cart");
     } catch {
       // Non-blocking
     }

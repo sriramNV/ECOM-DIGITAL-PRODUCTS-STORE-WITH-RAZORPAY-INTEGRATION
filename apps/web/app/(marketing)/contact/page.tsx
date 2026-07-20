@@ -1,4 +1,26 @@
+"use client";
+
+import { useState } from "react";
+
 export default function ContactPage() {
+  const [formData, setFormData] = useState({ name: "", email: "", message: "" });
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      setStatus(res.ok ? "success" : "error");
+    } catch {
+      setStatus("error");
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-16">
       <h1 className="text-3xl font-bold text-foreground mb-6">Contact Us</h1>
@@ -31,14 +53,17 @@ export default function ContactPage() {
           </div>
         </div>
 
-        <form className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">Name</label>
             <input
               id="name"
               type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
               placeholder="Your name"
+              required
             />
           </div>
 
@@ -47,8 +72,11 @@ export default function ContactPage() {
             <input
               id="email"
               type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
               placeholder="your@email.com"
+              required
             />
           </div>
 
@@ -57,17 +85,25 @@ export default function ContactPage() {
             <textarea
               id="message"
               rows={4}
+              value={formData.message}
+              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground resize-none"
               placeholder="How can we help?"
+              required
             />
           </div>
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-accent/90"
+            disabled={status === "loading"}
+            className="w-full rounded-lg bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-accent/90 disabled:opacity-50"
           >
-            Send Message
+            {status === "loading" ? "Sending..." : status === "success" ? "Message Sent!" : "Send Message"}
           </button>
+
+          {status === "error" && (
+            <p className="text-sm text-error text-center">Something went wrong. Please try again.</p>
+          )}
         </form>
       </div>
     </div>

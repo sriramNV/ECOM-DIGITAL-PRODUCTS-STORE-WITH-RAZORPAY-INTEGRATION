@@ -34,6 +34,11 @@ export function Navbar() {
 
           {session ? (
             <div className="flex items-center gap-3">
+              {session.user.role === "ADMIN" && (
+                <Link href="/admin" className="text-sm font-medium text-foreground-muted hover:text-foreground">
+                  Admin
+                </Link>
+              )}
               <Link href="/account" className="text-sm text-foreground-muted hover:text-foreground">
                 {session.user.name ?? "Account"}
               </Link>

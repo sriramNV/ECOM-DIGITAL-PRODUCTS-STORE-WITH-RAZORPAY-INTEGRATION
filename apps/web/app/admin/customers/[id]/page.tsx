@@ -26,6 +26,7 @@ export default function AdminCustomerDetailPage() {
       if (data) {
         setCustomer(data);
         setOrders(data.orders ?? []);
+        setNotes(data.notes ?? []);
       }
       setLoading(false);
     });

@@ -8,12 +8,26 @@ import { couponService } from "./coupon-service";
 import { logger } from "@/lib/logger";
 import { fulfillmentService } from "./fulfillment-service";
 import { emailService } from "./email-service";
+import { shippingAddressSchema } from "@/lib/schemas";
 
 export const checkoutService = {
   async createRazorpayOrder(userId: string, couponCode?: string, shippingAddress?: Record<string, unknown>) {
     const cart = await cartRepo.getByUserId(userId);
     if (!cart || cart.items.length === 0) {
       throw new Error("Cart is empty");
+    }
+
+    if (shippingAddress) {
+      const parsed = shippingAddressSchema.safeParse(shippingAddress);
+      if (!parsed.success) {
+        throw new Error("Invalid shipping address: " + JSON.stringify(parsed.error.errors));
+      }
+    }
+
+    for (const item of cart.items) {
+      if (item.variant.stock != null && item.variant.stock < item.quantity) {
+        throw new Error(`Insufficient stock for ${item.product?.title ?? "item"}`);
+      }
     }
 
     const items = cart.items.map((i) => ({
@@ -69,9 +83,22 @@ export const checkoutService = {
       throw new Error("Invalid payment signature");
     }
 
+    if (shippingAddress) {
+      const parsed = shippingAddressSchema.safeParse(shippingAddress);
+      if (!parsed.success) {
+        throw new Error("Invalid shipping address: " + JSON.stringify(parsed.error.errors));
+      }
+    }
+
     const cart = await cartRepo.getByUserId(userId);
     if (!cart || cart.items.length === 0) {
       throw new Error("Cart is empty");
+    }
+
+    for (const item of cart.items) {
+      if (item.variant.stock != null && item.variant.stock < item.quantity) {
+        throw new Error(`Insufficient stock for ${item.product?.title ?? "item"}`);
+      }
     }
 
     const existingPayment = await prisma.payment.findUnique({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,17 @@ export function ProductForm({ slug }: Props) {
     product?.images?.map((i: { url: string }) => i.url) ?? [""]
   );
   const [variants, setVariants] = useState<Variant[]>(product?.variants ?? []);
+
+  useEffect(() => {
+    if (product) {
+      setTitle(product.title ?? "");
+      setDescription(product.description ?? "");
+      setBasePrice(product.basePrice?.toString() ?? "");
+      setCategoryId(product.categoryId ?? "");
+      setImageUrls(product?.images?.map((i: { url: string }) => i.url) ?? [""]);
+      setVariants(product?.variants ?? []);
+    }
+  }, [product]);
 
   const mutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
