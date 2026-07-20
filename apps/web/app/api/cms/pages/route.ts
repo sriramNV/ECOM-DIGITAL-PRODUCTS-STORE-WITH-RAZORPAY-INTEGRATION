@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (guard) return guard;
     const { data, error: validationError } = validateBody(cmsPageSchema, await request.json());
     if (validationError) return validationError;
-    const page = await cmsRepo.createPage(data);
+    const page = await cmsRepo.createPage(data!);
     return NextResponse.json(page, { status: 201 });
   } catch (error) {
     logger.error({ error }, "Failed to create CMS page");

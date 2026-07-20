@@ -25,6 +25,6 @@ export const printifyOrders = {
       method: "POST",
       path: `/shops/${SHOP_ID}/orders/shipping.json`,
       body: { line_items: lineItems, address_to: address },
-    }),
+    });
   },
 };

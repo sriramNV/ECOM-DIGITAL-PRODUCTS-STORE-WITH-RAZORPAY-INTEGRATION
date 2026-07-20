@@ -8,7 +8,7 @@ export const cartRepo = {
         items: {
           include: {
             product: { select: { title: true, slug: true } },
-            variant: { select: { title: true, price: true, size: true, color: true } },
+            variant: { select: { title: true, price: true, size: true, color: true, stock: true } },
           },
         },
       },

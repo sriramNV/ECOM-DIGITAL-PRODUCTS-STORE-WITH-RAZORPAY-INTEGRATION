@@ -101,7 +101,7 @@ export const checkoutService = {
       }
     }
 
-    const existingPayment = await prisma.payment.findUnique({
+    const existingPayment = await prisma.payment.findFirst({
       where: { razorpayPaymentId: paymentId }
     });
     if (existingPayment) {
@@ -142,6 +142,7 @@ export const checkoutService = {
 
     // Remove couponCode from stored address to avoid leaking internal fields
     const { couponCode: _, ...cleanAddress } = (shippingAddress ?? {}) as Record<string, unknown>;
+    const sanitizedAddress = JSON.parse(JSON.stringify(cleanAddress));
 
     const orderNumber = await generateOrderNumber();
 
@@ -158,7 +159,7 @@ export const checkoutService = {
         discountAmount: discount,
         couponId: appliedCouponId,
         currency: "INR",
-        shippingAddress: cleanAddress,
+        shippingAddress: sanitizedAddress,
         payments: {
           create: {
             razorpayPaymentId: paymentId,
@@ -192,7 +193,7 @@ export const checkoutService = {
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
     if (user) {
-      emailService.sendOrderConfirmation(order, user as any).catch(logger.error);
+      emailService.sendOrderConfirmation(order as any, user as any).catch(logger.error);
     }
 
     fulfillmentService.submitOrder(order.id).catch(logger.error);
