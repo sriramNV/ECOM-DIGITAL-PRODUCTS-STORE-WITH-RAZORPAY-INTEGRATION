@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SessionProvider } from "@/providers/session-provider";
 import { PostHogProvider } from "@/providers/posthog-provider";
+import { QueryProvider } from "@/providers/query-provider";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={cn("font-sans", geist.variable)}>
       <body>
         <SessionProvider>
-          <PostHogProvider>{children}</PostHogProvider>
+          <QueryProvider>
+            <PostHogProvider>{children}</PostHogProvider>
+          </QueryProvider>
         </SessionProvider>
       </body>
     </html>
