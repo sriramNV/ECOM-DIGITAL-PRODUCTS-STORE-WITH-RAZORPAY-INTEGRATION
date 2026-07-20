@@ -40,6 +40,15 @@ export const useCartStore = create<CartStore>()(
       clearCart: () => set({ items: [] }),
       setItems: (items) => set({ items }),
     }),
-    { name: "pod-cart" },
+    {
+      name: "pod-cart",
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          return { items: [] };
+        }
+        return persistedState as CartStore;
+      },
+    },
   ),
 );

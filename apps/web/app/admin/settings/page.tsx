@@ -41,9 +41,7 @@ export default function SettingsPage() {
     return <p className="text-foreground-muted py-8 text-center">Loading…</p>;
   }
 
-  if (!form) return null;
-
-  const current = form;
+  const current = form ?? settings;
 
   return (
     <div className="max-w-xl space-y-6">
