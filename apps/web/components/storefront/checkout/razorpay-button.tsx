@@ -76,7 +76,7 @@ export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props)
           },
         },
         prefill: {
-          name: (shippingAddress.name as string) ?? "",
+          name: (shippingAddress.fullName as string) ?? "",
           email: (shippingAddress.email as string) ?? "",
           contact: (shippingAddress.phone as string) ?? "",
         },

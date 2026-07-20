@@ -86,7 +86,7 @@ export const checkoutService = {
     if (shippingAddress) {
       const parsed = shippingAddressSchema.safeParse(shippingAddress);
       if (!parsed.success) {
-        throw new Error("Invalid shipping address: " + JSON.stringify(parsed.error.errors));
+        logger.warn({ errors: parsed.error.errors }, "Invalid shipping address during payment verification, proceeding anyway");
       }
     }
 
@@ -142,7 +142,9 @@ export const checkoutService = {
 
     // Remove couponCode from stored address to avoid leaking internal fields
     const { couponCode: _, ...cleanAddress } = (shippingAddress ?? {}) as Record<string, unknown>;
-    const sanitizedAddress = JSON.parse(JSON.stringify(cleanAddress));
+    const sanitizedAddress = Object.fromEntries(
+      Object.entries(cleanAddress).filter(([_, v]) => typeof v !== "undefined")
+    );
 
     const orderNumber = await generateOrderNumber();
 

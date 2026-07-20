@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => { throw new Error("Invalid request body"); });
     const data = verifySchema.parse(body);
 
     const order = await checkoutService.verifyPayment(
