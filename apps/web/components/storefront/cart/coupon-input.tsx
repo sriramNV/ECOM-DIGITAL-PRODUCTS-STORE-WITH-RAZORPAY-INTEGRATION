@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
+import { Tag, X } from "lucide-react";
 
 type Props = {
   subtotal: number;
@@ -20,16 +21,19 @@ export function CouponInput({ subtotal, onApply, onRemove, appliedCode, discount
   return (
     <div className="space-y-2">
       {appliedCode ? (
-        <div className="flex items-center justify-between bg-surface rounded-lg p-3">
-          <div>
-            <p className="text-sm font-medium text-foreground">{appliedCode}</p>
-            {discount ? (
-              <p className="text-sm text-green-600">-{formatCurrency(discount)}</p>
-            ) : null}
+        <div className="flex items-center justify-between bg-success-bg border border-success/20 rounded-lg p-3">
+          <div className="flex items-center gap-3">
+            <Tag className="h-4 w-4 text-success" />
+            <div>
+              <p className="text-sm font-medium text-foreground">{appliedCode}</p>
+              {discount ? (
+                <p className="text-sm text-success">-{formatCurrency(discount)}</p>
+              ) : null}
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onRemove}>
-            Remove
-          </Button>
+          <button onClick={onRemove} className="text-foreground-faint hover:text-foreground transition-colors" aria-label="Remove coupon">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       ) : (
         <form
@@ -40,7 +44,7 @@ export function CouponInput({ subtotal, onApply, onRemove, appliedCode, discount
           className="flex gap-2"
         >
           <Input
-            placeholder="Coupon code"
+            placeholder="Enter coupon code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             className="flex-1"
@@ -50,7 +54,7 @@ export function CouponInput({ subtotal, onApply, onRemove, appliedCode, discount
           </Button>
         </form>
       )}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-error">{error}</p>}
     </div>
   );
 }

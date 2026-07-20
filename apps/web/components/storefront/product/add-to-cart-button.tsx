@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/stores/cart-store";
+import { Check, ShoppingCart } from "lucide-react";
 
 type Props = {
   productId: string;
@@ -45,8 +46,21 @@ export function AddToCartButton({ productId, variantId, title, image, price, siz
       onClick={handleClick}
       disabled={disabled || !variantId}
       className="w-full"
+      size="lg"
     >
-      {added ? "Added!" : disabled ? "Sold Out" : "Add to Cart"}
+      {added ? (
+        <span className="flex items-center gap-2">
+          <Check className="h-4 w-4" />
+          Added to Cart
+        </span>
+      ) : disabled ? (
+        "Sold Out"
+      ) : (
+        <span className="flex items-center gap-2">
+          <ShoppingCart className="h-4 w-4" />
+          Add to Cart
+        </span>
+      )}
     </Button>
   );
 }

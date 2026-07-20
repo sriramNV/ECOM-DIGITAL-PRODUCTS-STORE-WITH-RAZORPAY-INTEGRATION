@@ -10,8 +10,8 @@ export function RecentOrders() {
     queryFn: () => fetch("/api/admin/orders?limit=5").then(r => r.json()),
   });
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="text-lg font-semibold text-foreground mb-4">Recent Orders</h2>
+    <div className="rounded-xl border border-border bg-surface-raised p-5">
+      <h2 className="text-base font-semibold text-foreground mb-4">Recent Orders</h2>
       <DataTable
         columns={[
           { header: "Order", accessorKey: "orderNumber" },

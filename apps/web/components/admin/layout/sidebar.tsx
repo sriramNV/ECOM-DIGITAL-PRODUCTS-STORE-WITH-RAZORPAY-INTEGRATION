@@ -10,11 +10,14 @@ export function Sidebar() {
 
   return (
     <aside className="w-64 flex-shrink-0 hidden lg:block bg-surface-inverse text-foreground-inverse">
-      <div className="p-4">
-        <Link href="/admin/dashboard" className="text-lg font-bold block mb-6">
-          POD Store
-        </Link>
-        <nav className="space-y-1">
+      <div className="flex flex-col h-full">
+        <div className="p-4 border-b border-white/10">
+          <Link href="/admin/dashboard" className="text-lg font-bold block">
+            POD Store
+          </Link>
+          <p className="text-xs text-white/40 mt-0.5">Admin Panel</p>
+        </div>
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
@@ -22,11 +25,13 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                  active ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white/80",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150",
+                  active
+                    ? "bg-white/10 text-white font-medium"
+                    : "text-white/60 hover:bg-white/5 hover:text-white/80",
                 )}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-white/40")} />
                 {item.label}
               </Link>
             );

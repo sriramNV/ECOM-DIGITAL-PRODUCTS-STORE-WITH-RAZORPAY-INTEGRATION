@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/stores/cart-store";
 import { formatCurrency } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 
 declare global {
   interface Window {
@@ -68,6 +69,7 @@ export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props)
             router.push(`/checkout/success?orderId=${order.id}`);
           } else {
             setError("Payment verification failed. Please contact support.");
+            setLoading(false);
           }
         },
         modal: {
@@ -92,11 +94,36 @@ export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props)
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      <div className="border-t border-border pt-4 space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-foreground-muted">Subtotal ({items.length} items)</span>
+          <span className="text-foreground">{formatCurrency(subtotal)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-foreground-muted">Shipping</span>
+          <span className="text-foreground">{shipping === 0 ? "Free" : formatCurrency(shipping)}</span>
+        </div>
+        <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
+          <span className="text-foreground">Total</span>
+          <span className="text-foreground">{formatCurrency(total)}</span>
+        </div>
+      </div>
       <Button onClick={handlePayment} disabled={disabled || loading} className="w-full" size="lg">
-        {loading ? "Processing..." : `Pay ${formatCurrency(total)}`}
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Processing...
+          </span>
+        ) : (
+          `Pay ${formatCurrency(total)}`
+        )}
       </Button>
-      {error && <p className="text-sm text-error">{error}</p>}
+      {error && (
+        <div className="rounded-lg bg-error-bg border border-error/20 p-3">
+          <p className="text-sm text-error">{error}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,7 +12,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Orders" value={data?.totalOrders ?? 0} />
         <StatCard label="Today's Orders" value={data?.todayOrders ?? 0} />

@@ -6,7 +6,7 @@
 
 :root {
   --bg: #ffffff;
-  --surface: #f8f9fa;
+  --surface: #f3f4f6;
   --surface-raised: #ffffff;
   --surface-inverse: #1a1a2e;
 
@@ -189,9 +189,17 @@ body {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
   html {
     @apply font-sans;
   }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility text-pretty {
+  text-wrap: pretty;
 }

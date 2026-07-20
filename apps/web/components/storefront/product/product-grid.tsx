@@ -1,3 +1,4 @@
+import { PackageSearch } from "lucide-react";
 import { ProductCard } from "./product-card";
 
 type Product = {
@@ -14,9 +15,14 @@ type Props = {
 export function ProductGrid({ products }: Props) {
   if (products.length === 0) {
     return (
-      <div className="text-center py-16">
-        <p className="text-foreground-muted text-lg">No products found</p>
-        <p className="text-foreground-muted text-sm mt-2">Try browsing a different category or check back later.</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <PackageSearch className="h-6 w-6 text-foreground-muted" />
+        </div>
+        <p className="text-foreground font-medium">No products found</p>
+        <p className="text-sm text-foreground-muted mt-1 max-w-sm">
+          Try browsing a different category or check back later — new products are added regularly.
+        </p>
       </div>
     );
   }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { use } from "react";
+import { useState, useEffect, use } from "react";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/storefront/shared/breadcrumbs";
 import { ProductGallery } from "@/components/storefront/product/product-gallery";
@@ -26,7 +25,20 @@ export default function ProductDetailPage({ params }: Props) {
   }, [slug]);
 
   if (loading) {
-    return <div className="max-w-7xl mx-auto px-4 py-8"><Skeleton className="h-96" /></div>;
+    return (
+      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          <Skeleton className="aspect-square rounded-lg" />
+          <div className="space-y-6">
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-10 w-1/3" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!product) { notFound(); return null; }
@@ -42,24 +54,26 @@ export default function ProductDetailPage({ params }: Props) {
           { label: product.title },
         ]}
       />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mt-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mt-6">
         <ProductGallery
           images={product.images.map((img: any) => ({ url: img.url, alt: img.alt ?? product.title }))}
         />
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{product.title}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground text-balance">{product.title}</h1>
             {product.category && (
-              <p className="text-sm text-foreground-muted mt-1">{product.category.name}</p>
+              <p className="text-sm text-foreground-muted mt-1.5">{product.category.name}</p>
             )}
           </div>
           <PriceDisplay
             price={selectedVariant ? selectedVariant.price : Math.min(...product.variants.map((v: any) => v.price))}
             size="lg"
           />
-          <div className="border-t border-border pt-6">
-            <VariantSelector variants={product.variants} selectedId={selectedVariantId} onSelect={(v) => setSelectedVariantId(v.id)} />
-          </div>
+          {product.variants.length > 1 && (
+            <div className="border-t border-border pt-8">
+              <VariantSelector variants={product.variants} selectedId={selectedVariantId} onSelect={(v) => setSelectedVariantId(v.id)} />
+            </div>
+          )}
           <AddToCartButton
             productId={product.id}
             variantId={selectedVariant?.id ?? product.variants[0]?.id}
@@ -71,10 +85,12 @@ export default function ProductDetailPage({ params }: Props) {
             slug={product.slug}
             disabled={product.variants.length === 0}
           />
-          <div className="border-t border-border pt-6">
-            <h2 className="text-sm font-medium text-foreground mb-2">Description</h2>
-            <p className="text-sm text-foreground-muted leading-relaxed">{product.description}</p>
-          </div>
+          {product.description && (
+            <div className="border-t border-border pt-8">
+              <h2 className="text-sm font-semibold text-foreground mb-3">Description</h2>
+              <p className="text-sm text-foreground-muted leading-relaxed text-pretty">{product.description}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
