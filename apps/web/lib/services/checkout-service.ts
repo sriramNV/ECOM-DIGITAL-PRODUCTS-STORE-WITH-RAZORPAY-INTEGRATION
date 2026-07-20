@@ -7,6 +7,7 @@ import { calculateSubtotal, calculateTax, calculateShipping, calculateTotal } fr
 import { couponService } from "./coupon-service";
 import { logger } from "@/lib/logger";
 import { fulfillmentService } from "./fulfillment-service";
+import { emailService } from "./email-service";
 
 export const checkoutService = {
   async createRazorpayOrder(userId: string, couponCode?: string) {
@@ -142,6 +143,11 @@ export const checkoutService = {
     await cartRepo.clearCart(userId);
 
     logger.info({ orderId: order.id, orderNumber }, "Order created after payment");
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+    if (user) {
+      emailService.sendOrderConfirmation(order, user as any).catch(logger.error);
+    }
 
     fulfillmentService.submitOrder(order.id).catch(logger.error);
 

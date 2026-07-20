@@ -4,6 +4,7 @@ import { printifyOrders } from "@/lib/printify/orders";
 import { orderRepo } from "@/lib/repositories/order-repo";
 import { deadLetterRepo } from "@/lib/repositories/dead-letter-repo";
 import { logger } from "@/lib/logger";
+import { emailService } from "./email-service";
 
 const PRINTIFY_WEBHOOK_SECRET = process.env.PRINTIFY_WEBHOOK_SECRET!;
 
@@ -94,6 +95,20 @@ export const fulfillmentService = {
             shippingMethod: `${event.data.shipping.carrier} - ${event.data.shipping.tracking_number}`,
           },
         });
+      }
+
+      const orderEntity = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, userId: true, orderNumber: true },
+      });
+      if (orderEntity) {
+        const user = await prisma.user.findUnique({ where: { id: orderEntity.userId }, select: { email: true } });
+        if (newStatus === "SHIPPED" && user && event.data?.shipping) {
+          emailService.sendShipmentNotification(orderEntity as any, { carrier: event.data.shipping.carrier, trackingNumber: event.data.shipping.tracking_number, trackingUrl: event.data.shipping.tracking_url }, user.email).catch(logger.error);
+        }
+        if (newStatus === "DELIVERED" && user) {
+          emailService.sendDeliveryConfirmation(orderEntity as any, user.email).catch(logger.error);
+        }
       }
 
       logger.info({ orderId, status: newStatus, event: event.event }, "Order status updated via Printify webhook");
