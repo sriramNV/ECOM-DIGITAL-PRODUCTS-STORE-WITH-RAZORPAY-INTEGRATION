@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("homepage loads", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1")).toContainText("POD Store");
+  await expect(page.locator("h1")).toContainText("Premium Print-on-Demand");
 });
 
 test("health check returns ok", async ({ request }) => {
