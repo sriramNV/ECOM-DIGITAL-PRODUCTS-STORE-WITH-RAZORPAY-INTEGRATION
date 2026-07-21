@@ -13,3 +13,4 @@ test-results/
 *.production.env
 .next-dev.log
 playwright-report/
+./pentest-report.md
