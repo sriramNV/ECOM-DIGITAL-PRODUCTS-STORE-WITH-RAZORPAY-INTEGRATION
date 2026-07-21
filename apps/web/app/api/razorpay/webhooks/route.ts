@@ -5,22 +5,30 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { handleApiError } from "@/lib/api-error-handler";
 
-const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET!;
+const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
+if (!WEBHOOK_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("RAZORPAY_WEBHOOK_SECRET environment variable is required");
+  }
+  logger.warn("RAZORPAY_WEBHOOK_SECRET not set - webhook signatures will not be verified");
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
-    const signature = request.headers.get("x-razorpay-signature");
 
-    if (!signature) {
-      return NextResponse.json({ error: "Missing signature" }, { status: 401 });
-    }
-    const expected = crypto.createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
-    const sigBuf = Buffer.from(signature, "hex");
-    const expBuf = Buffer.from(expected, "hex");
-    const safe = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
-    if (!safe) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    if (WEBHOOK_SECRET) {
+      const signature = request.headers.get("x-razorpay-signature");
+      if (!signature) {
+        return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+      }
+      const expected = crypto.createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
+      const sigBuf = Buffer.from(signature, "hex");
+      const expBuf = Buffer.from(expected, "hex");
+      const safe = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
+      if (!safe) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
     }
 
     const event = JSON.parse(body);
@@ -47,6 +55,12 @@ export async function POST(request: NextRequest) {
           });
         }
       }
+    }
+
+    if (event.event === "payment.failed") {
+      const paymentId = event.payload?.payment?.entity?.id;
+      const errorDesc = event.payload?.payment?.entity?.error_description;
+      logger.warn({ paymentId, error: errorDesc }, "Razorpay payment failed");
     }
 
     return NextResponse.json({ status: "ok" });

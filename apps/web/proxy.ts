@@ -23,7 +23,8 @@ export default auth(async (req) => {
   if (pathname.startsWith("/api/")) {
     const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
     const ip = forwardedFor.split(",").shift()?.trim() || req.headers.get("x-real-ip") || "unknown";
-    const allowed = await rateLimit(ip, 100, 60000);
+    const maxRequests = pathname.startsWith("/api/auth/") ? 10 : 100;
+    const allowed = await rateLimit(ip, maxRequests, 60000);
     if (!allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }

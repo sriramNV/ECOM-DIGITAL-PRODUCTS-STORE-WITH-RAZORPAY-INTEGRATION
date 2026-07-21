@@ -128,12 +128,7 @@ export const checkoutService = {
     let discount = 0;
     let appliedCouponId: string | undefined;
 
-    const total = calculateTotal(subtotal, shipping, tax, discount);
-
     const expectedAmount = rzpOrder.notes?.expectedAmount;
-    if (expectedAmount !== undefined && Number(expectedAmount) !== total) {
-      throw new Error("Payment amount mismatch - possible tampering detected");
-    }
 
     // Use validated shipping address data instead of raw input
     const sanitizedAddress: Record<string, unknown> = {};
@@ -185,12 +180,22 @@ export const checkoutService = {
           appliedCouponId = currentCoupon.id;
         }
 
+        const totalWithDiscount = calculateTotal(subtotal, shipping, tax, discount);
+
+        if (expectedAmount !== undefined && Number(expectedAmount) !== totalWithDiscount) {
+          throw new Error("Payment amount mismatch - possible tampering detected");
+        }
+
+        if (payment.amount !== Math.round(totalWithDiscount * 100)) {
+          throw new Error("Payment amount mismatch - captured amount differs from expected");
+        }
+
         const created = await tx.order.create({
           data: {
             orderNumber,
             userId,
             status: "PAID",
-            totalAmount: total,
+            totalAmount: totalWithDiscount,
             subtotalAmount: subtotal,
             shippingAmount: shipping,
             taxAmount: tax,
@@ -204,7 +209,7 @@ export const checkoutService = {
                 razorpayPaymentId: paymentId,
                 razorpayOrderId: orderId,
                 razorpaySignature: signature,
-                amount: total,
+                amount: totalWithDiscount,
                 status: "COMPLETED",
               },
             },
