@@ -19,7 +19,7 @@ async function seedAdmin() {
         role: "ADMIN",
       },
     });
-    console.log("Admin user created: admin@podstore.com / admin123");
+    console.log("Admin user created successfully");
   } else {
     console.log("Admin user already exists");
   }

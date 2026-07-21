@@ -5,10 +5,12 @@ import { adminGuard } from "@/lib/admin-guard";
 import { validateBody, cmsPageSchema } from "@/lib/schemas";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const guard = await adminGuard();
+    if (guard) return guard;
     const { id } = await params;
     const page = await cmsRepo.getPage(id);
 

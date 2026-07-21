@@ -44,7 +44,7 @@ export async function PATCH(
       case "submit_to_printify": {
         const updated = await prisma.order.updateMany({
           where: { id, status: "PAID", printifyOrderId: null },
-          data: { status: "PROCESSING" },
+          data: {},
         });
         if (updated.count === 0) {
           return NextResponse.json({ error: "Order cannot be submitted to Printify (already processing or submitted)" }, { status: 400 });
