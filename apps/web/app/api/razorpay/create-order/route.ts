@@ -15,6 +15,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     logger.error({ error }, "Failed to create Razorpay order");
-    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
+    return NextResponse.json({ error: "Failed to create order" }, { status: 400 });
   }
 }

@@ -36,7 +36,7 @@ export function ProductGrid({ products }: Props) {
           slug={product.slug}
           imageUrl={product.images[0]?.url ?? "/placeholder.svg"}
           imageAlt={product.images[0]?.alt ?? null}
-          minPrice={Math.min(...product.variants.map((v) => v.price))}
+          minPrice={product.variants.length > 0 ? Math.min(...product.variants.map((v) => v.price)) : 0}
         />
       ))}
     </div>

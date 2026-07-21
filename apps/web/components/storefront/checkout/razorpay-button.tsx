@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/stores/cart-store";
 import { formatCurrency } from "@/lib/utils";
+import { calculateSubtotal, calculateShipping, calculateTax, calculateTotal } from "@/lib/services/pricing-service";
 import { Loader2 } from "lucide-react";
 
 declare global {
@@ -26,9 +27,11 @@ export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const shipping = subtotal >= 999 ? 0 : 99;
-  const total = subtotal + shipping;
+  const cartItems = items.map((i) => ({ unitPrice: i.price, quantity: i.quantity }));
+  const subtotal = calculateSubtotal(cartItems);
+  const shipping = calculateShipping(subtotal);
+  const tax = calculateTax(subtotal);
+  const total = calculateTotal(subtotal, shipping, tax, 0);
 
   async function handlePayment() {
     setLoading(true);
@@ -103,6 +106,10 @@ export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props)
         <div className="flex justify-between text-sm">
           <span className="text-foreground-muted">Shipping</span>
           <span className="text-foreground">{shipping === 0 ? "Free" : formatCurrency(shipping)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-foreground-muted">Tax (18%)</span>
+          <span className="text-foreground">{formatCurrency(tax)}</span>
         </div>
         <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
           <span className="text-foreground">Total</span>

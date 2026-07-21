@@ -59,6 +59,23 @@ export const orderRepo = {
   },
 
   async updateStatus(id: string, status: string, note?: string) {
+    const allowedTransitions: Record<string, string[]> = {
+      PENDING_PAYMENT: ["PAID", "CANCELLED"],
+      PAID: ["PROCESSING", "CANCELLED", "REFUNDED"],
+      PROCESSING: ["PRINTING", "CANCELLED"],
+      PRINTING: ["SHIPPED", "CANCELLED"],
+      SHIPPED: ["DELIVERED"],
+      DELIVERED: ["REFUNDED"],
+      CANCELLED: ["REFUNDED"],
+    };
+
+    const currentOrder = await prisma.order.findUnique({ where: { id }, select: { status: true } });
+    if (!currentOrder) throw new Error("Order not found");
+    const allowed = allowedTransitions[currentOrder.status as string];
+    if (allowed && !allowed.includes(status)) {
+      throw new Error(`Cannot transition order from ${currentOrder.status} to ${status}`);
+    }
+
     const order = await prisma.order.update({
       where: { id },
       data: { status: status as OrderStatus },

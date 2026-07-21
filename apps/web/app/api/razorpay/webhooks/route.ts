@@ -20,8 +20,9 @@ export async function POST(request: NextRequest) {
     const event = JSON.parse(body);
     const eventId = event.event_id ?? `${event.event}:${(event.payload?.payment?.entity?.id) ?? Date.now()}`;
 
-    const processed = await redis.get(`webhook:${eventId}`);
-    if (processed) {
+    const dedupKey = `webhook:${eventId}`;
+    const alreadyProcessed = await redis.set(dedupKey, "1", "EX", 86400, "NX");
+    if (!alreadyProcessed) {
       return NextResponse.json({ status: "already_processed" });
     }
 
@@ -41,8 +42,6 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-
-    await redis.set(`webhook:${eventId}`, "1", "EX", 86400);
 
     return NextResponse.json({ status: "ok" });
   } catch (error) {

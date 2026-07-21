@@ -25,8 +25,8 @@ type StatusHistory = {
 };
 
 type Address = {
-  name: string;
-  street: string;
+  fullName: string;
+  addressLine1: string;
   city: string;
   state: string;
   pincode: string;
@@ -114,8 +114,8 @@ export function OrderDetail({ orderId }: Props) {
           <CardContent className="space-y-1 text-sm">
             {order.shippingAddress ? (
               <>
-                <p>{order.shippingAddress.name}</p>
-                <p>{order.shippingAddress.street}</p>
+                <p>{order.shippingAddress.fullName}</p>
+                <p>{order.shippingAddress.addressLine1}</p>
                 <p>{order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}</p>
                 <p className="text-foreground-muted">{order.shippingAddress.phone}</p>
               </>

@@ -9,7 +9,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 export function ProductTable() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products"],
-    queryFn: () => fetch("/api/products?limit=100").then((r) => r.json()),
+    queryFn: () => fetch("/api/products?limit=100&isActive=all").then((r) => r.json()),
   });
 
   return (

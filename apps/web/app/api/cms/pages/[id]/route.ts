@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cmsRepo } from "@/lib/repositories/cms-repo";
 import { logger } from "@/lib/logger";
 import { adminGuard } from "@/lib/admin-guard";
+import { validateBody, cmsPageSchema } from "@/lib/schemas";
 
 export async function GET(
   _request: NextRequest,
@@ -26,12 +27,14 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const guard = await adminGuard();
-  if (guard) return guard;
   try {
+    const guard = await adminGuard();
+    if (guard) return guard;
     const { id } = await params;
-    const data = await request.json();
-    const page = await cmsRepo.updatePage(id, data);
+    const body = await request.json();
+    const { data, error: validationError } = validateBody(cmsPageSchema, body);
+    if (validationError) return validationError;
+    const page = await cmsRepo.updatePage(id, data!);
 
     return NextResponse.json(page);
   } catch (error) {

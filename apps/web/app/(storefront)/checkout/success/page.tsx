@@ -16,7 +16,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
         Thank you for your purchase. You&apos;ll receive a confirmation email shortly.
       </p>
       <div className="flex gap-4 justify-center">
-        <Link href="/account/orders"><Button variant="outline">View Orders</Button></Link>
+        <Link href="/account"><Button variant="outline">View Orders</Button></Link>
         <Link href="/products"><Button>Continue Shopping</Button></Link>
       </div>
     </div>

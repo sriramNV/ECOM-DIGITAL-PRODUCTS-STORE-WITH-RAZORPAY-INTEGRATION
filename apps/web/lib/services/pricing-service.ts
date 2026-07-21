@@ -12,7 +12,7 @@ export function calculateTotal(
   tax: number = 0,
   discount: number = 0,
 ): number {
-  return subtotal + shipping + tax - discount;
+  return Math.max(0, subtotal + shipping + tax - discount);
 }
 
 export function calculateShipping(subtotal: number, freeThreshold: number = 999): number {

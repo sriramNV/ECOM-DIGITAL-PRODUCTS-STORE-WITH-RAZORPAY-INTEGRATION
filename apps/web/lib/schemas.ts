@@ -27,21 +27,23 @@ export const cartMergeSchema = z.object({
 
 export const couponCreateSchema = z.object({
   code: z.string().min(3).max(20).transform(s => s.toUpperCase()),
-  type: z.enum(["PERCENTAGE", "FIXED"]),
-  value: z.number().min(0).max(100),
+  type: z.enum(["percentage", "fixed", "free_shipping"]),
+  value: z.number().min(0),
   minOrder: z.number().min(0).optional(),
   maxDiscount: z.number().min(0).optional(),
   usageLimit: z.number().int().min(1).optional(),
   perUserLimit: z.number().int().min(1).optional(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string(),
+  endDate: z.string().optional(),
 });
 
 export const cmsPageSchema = z.object({
   title: z.string().min(1).max(200),
   slug: z.string().min(1).max(200),
-  content: z.any(),
-  published: z.boolean().optional(),
+  content: z.any().optional(),
+  seoTitle: z.string().nullable().optional(),
+  seoDesc: z.string().nullable().optional(),
+  isPublished: z.boolean().optional(),
 });
 
 export const adminOrderActionSchema = z.object({

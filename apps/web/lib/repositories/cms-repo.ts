@@ -18,11 +18,11 @@ export const cmsRepo = {
     return prisma.page.findUnique({ where: { slug, isPublished: true } });
   },
 
-  async createPage(data: { title: string; slug: string; content?: unknown }) {
+  async createPage(data: { title: string; slug: string; content?: unknown; seoTitle?: string | null; seoDesc?: string | null; isPublished?: boolean }) {
     return prisma.page.create({ data: data as any });
   },
 
-  async updatePage(id: string, data: { title?: string; content?: unknown; seoTitle?: string; seoDesc?: string; isPublished?: boolean }) {
+  async updatePage(id: string, data: { title?: string; content?: unknown; seoTitle?: string | null; seoDesc?: string | null; isPublished?: boolean }) {
     return prisma.page.update({ where: { id }, data: data as any });
   },
 
@@ -51,9 +51,9 @@ export const cmsRepo = {
     });
   },
 
-  async listCollections() {
+  async listCollections(slug?: string) {
     return prisma.collection.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...(slug ? { slug } : {}) },
       include: { products: { include: { product: { include: { images: { take: 1 } } } } } },
     });
   },

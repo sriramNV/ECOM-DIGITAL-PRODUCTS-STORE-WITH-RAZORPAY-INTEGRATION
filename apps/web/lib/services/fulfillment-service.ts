@@ -25,18 +25,33 @@ export const fulfillmentService = {
     }
 
     try {
+      const variants = await prisma.productVariant.findMany({
+        where: { id: { in: order.items.map((i) => i.variantId) } },
+        select: { id: true, printifyVariantId: true },
+      });
+      const variantMap = new Map(variants.map((v) => [v.id, v.printifyVariantId]));
+
       const result = await printifyOrders.submit({
         external_id: order.id,
-        line_items: order.items.map((item) => ({
-          product_id: item.productId,
-          variant_id: Number(item.variantId),
-          quantity: item.quantity,
-        })),
+        line_items: order.items
+          .filter((item) => {
+            const pid = variantMap.get(item.variantId);
+            if (!pid) {
+              logger.warn({ variantId: item.variantId, orderId }, "Skipping line item without printifyVariantId");
+              return false;
+            }
+            return true;
+          })
+          .map((item) => ({
+            product_id: item.productId,
+            variant_id: variantMap.get(item.variantId)!,
+            quantity: item.quantity,
+          })),
         shipping_method: 1,
         address_to: {
-          first_name: (address.name ?? "").split(" ")[0] || "Customer",
-          last_name: (address.name ?? "").split(" ").slice(1).join(" ") || "",
-          address1: address.street ?? "",
+          first_name: (address.fullName ?? "").split(" ")[0] || "Customer",
+          last_name: (address.fullName ?? "").split(" ").slice(1).join(" ") || "",
+          address1: address.addressLine1 ?? "",
           city: address.city ?? "",
           state: address.state ?? "",
           zip: address.pincode ?? "",
@@ -65,30 +80,44 @@ export const fulfillmentService = {
   },
 
   async handleWebhook(payload: unknown, signature: string, rawBody: string) {
-    const expected = crypto
-      .createHmac("sha256", PRINTIFY_WEBHOOK_SECRET)
-      .update(rawBody)
-      .digest("hex");
+    try {
+      const expected = crypto
+        .createHmac("sha256", PRINTIFY_WEBHOOK_SECRET)
+        .update(rawBody)
+        .digest("hex");
 
-    const sigBuffer = Buffer.from(signature, "hex");
-    const expectedBuffer = Buffer.from(expected, "hex");
-    const safe = sigBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(sigBuffer, expectedBuffer);
-    if (!safe) {
-      throw new Error("Invalid Printify webhook signature");
-    }
+      const sigBuffer = Buffer.from(signature, "hex");
+      const expectedBuffer = Buffer.from(expected, "hex");
+      const safe = sigBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+      if (!safe) {
+        throw new Error("Invalid Printify webhook signature");
+      }
 
-    const event = payload as { event: string; data?: { order_id?: string; external_id?: string; shipping?: { carrier: string; tracking_number: string; tracking_url: string } } };
-    const orderId = event.data?.external_id;
-    if (!orderId) return;
+      const event = payload as { event: string; data?: { order_id?: string; external_id?: string; shipping?: { carrier: string; tracking_number: string; tracking_url: string } } };
+      const orderId = event.data?.external_id;
+      if (!orderId) {
+        logger.warn({ event: event.event }, "Webhook missing external_id");
+        return;
+      }
 
-    const statusMap: Record<string, string> = {
-      "order:sent-to-production": "PRINTING",
-      "order:shipment:created": "SHIPPED",
-      "order:shipment:delivered": "DELIVERED",
-    };
+      const statusMap: Record<string, string> = {
+        "order:sent-to-production": "PRINTING",
+        "order:shipment:created": "SHIPPED",
+        "order:shipment:delivered": "DELIVERED",
+      };
 
-    const newStatus = statusMap[event.event];
-    if (newStatus) {
+      const newStatus = statusMap[event.event];
+      if (!newStatus) {
+        logger.warn({ event: event.event }, "Unrecognized Printify webhook event");
+        return;
+      }
+
+      const existingOrder = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+      if (!existingOrder) {
+        logger.warn({ orderId, event: event.event }, "Order not found for Printify webhook, skipping");
+        return;
+      }
+
       await orderRepo.updateStatus(orderId, newStatus);
 
       if (newStatus === "SHIPPED" && event.data?.shipping) {
@@ -115,6 +144,8 @@ export const fulfillmentService = {
       }
 
       logger.info({ orderId, status: newStatus, event: event.event }, "Order status updated via Printify webhook");
+    } catch (error) {
+      logger.error({ error, event: (payload as any)?.event }, "Error handling Printify webhook");
     }
   },
 };

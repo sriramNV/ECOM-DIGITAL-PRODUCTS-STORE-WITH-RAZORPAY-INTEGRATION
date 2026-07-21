@@ -53,8 +53,16 @@ export const checkoutService = {
     const total = calculateTotal(subtotal, shipping, tax, discount);
     const amountInPaise = Math.round(total * 100);
 
-    const notes: Record<string, string> = { userId, expectedAmount: String(total) };
+    const notes: Record<string, string> = {
+      userId,
+      expectedAmount: String(total),
+      subtotal: String(subtotal),
+      shipping: String(shipping),
+      tax: String(tax),
+      discount: String(discount),
+    };
     if (couponCode) notes.couponCode = couponCode;
+    if (appliedCouponId) notes.appliedCouponId = appliedCouponId;
 
     const rzpOrder = await razorpay.orders.create({
       amount: amountInPaise,
@@ -86,8 +94,13 @@ export const checkoutService = {
     if (shippingAddress) {
       const parsed = shippingAddressSchema.safeParse(shippingAddress);
       if (!parsed.success) {
-        logger.warn({ errors: parsed.error.errors }, "Invalid shipping address during payment verification, proceeding anyway");
+        throw new Error("Invalid shipping address");
       }
+    }
+
+    const rzpOrder = await razorpay.orders.fetch(orderId);
+    if (rzpOrder.status === "paid") {
+      throw new Error("Order already paid");
     }
 
     const cart = await cartRepo.getByUserId(userId);
@@ -120,21 +133,20 @@ export const checkoutService = {
     const shipping = calculateShipping(subtotal);
     const tax = calculateTax(subtotal);
 
-    const couponCode = shippingAddress?.couponCode as string | undefined;
+    const couponCode = rzpOrder.notes?.couponCode as string | undefined;
     let discount = 0;
     let appliedCouponId: string | undefined;
     if (couponCode) {
-      const result = await couponService.validateAndApply(couponCode, subtotal, userId);
-      if (result.valid) {
-        discount = result.discount;
-        const coupon = await prisma.coupon.findUnique({ where: { code: result.code } });
+      discount = Number(rzpOrder.notes?.discount) || 0;
+      appliedCouponId = rzpOrder.notes?.appliedCouponId as string | undefined;
+      if (!appliedCouponId) {
+        const coupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
         appliedCouponId = coupon?.id;
       }
     }
 
     const total = calculateTotal(subtotal, shipping, tax, discount);
 
-    const rzpOrder = await razorpay.orders.fetch(orderId);
     const expectedAmount = rzpOrder.notes?.expectedAmount;
     if (expectedAmount !== undefined && Number(expectedAmount) !== total) {
       throw new Error("Payment amount mismatch - possible tampering detected");
@@ -148,48 +160,57 @@ export const checkoutService = {
 
     const orderNumber = await generateOrderNumber();
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        userId,
-        status: "PAID",
-        totalAmount: total,
-        subtotalAmount: subtotal,
-        shippingAmount: shipping,
-        taxAmount: tax,
-        taxRate: 18,
-        discountAmount: discount,
-        couponId: appliedCouponId,
-        currency: "INR",
-        shippingAddress: sanitizedAddress as any,
-        payments: {
-          create: {
-            razorpayPaymentId: paymentId,
-            razorpayOrderId: orderId,
-            razorpaySignature: signature,
-            amount: total,
-            status: "COMPLETED",
+    const order = await prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
+        data: {
+          orderNumber,
+          userId,
+          status: "PAID",
+          totalAmount: total,
+          subtotalAmount: subtotal,
+          shippingAmount: shipping,
+          taxAmount: tax,
+          taxRate: 18,
+          discountAmount: discount,
+          couponId: appliedCouponId,
+          currency: "INR",
+          shippingAddress: sanitizedAddress as any,
+          payments: {
+            create: {
+              razorpayPaymentId: paymentId,
+              razorpayOrderId: orderId,
+              razorpaySignature: signature,
+              amount: total,
+              status: "COMPLETED",
+            },
+          },
+          items: {
+            create: cart.items.map((ci) => ({
+              productId: ci.productId,
+              variantId: ci.variantId,
+              title: ci.product.title,
+              variant: ci.variant.title,
+              quantity: ci.quantity,
+              unitPrice: Number(ci.variant.price),
+              totalPrice: Number(ci.variant.price) * ci.quantity,
+            })),
+          },
+          statusHistory: {
+            create: { status: "PAID" },
           },
         },
-        items: {
-          create: cart.items.map((ci) => ({
-            productId: ci.productId,
-            variantId: ci.variantId,
-            title: ci.product.title,
-            variant: ci.variant.title,
-            quantity: ci.quantity,
-            unitPrice: Number(ci.variant.price),
-            totalPrice: Number(ci.variant.price) * ci.quantity,
-          })),
-        },
-        statusHistory: {
-          create: { status: "PAID" },
-        },
-      },
-      include: { items: true },
-    });
+        include: { items: true },
+      });
 
-    await cartRepo.clearCart(userId);
+      for (const item of cart.items) {
+        await tx.productVariant.update({
+          where: { id: item.variantId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+
+      return created;
+    });
 
     logger.info({ orderId: order.id, orderNumber }, "Order created after payment");
 
@@ -199,6 +220,8 @@ export const checkoutService = {
     }
 
     fulfillmentService.submitOrder(order.id).catch(logger.error);
+
+    await cartRepo.clearCart(userId);
 
     return { id: order.id, orderNumber };
   },

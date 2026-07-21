@@ -55,6 +55,7 @@ export function OrderTable() {
         setTotal(data.total ?? 0);
         setTotalPages(data.totalPages ?? 1);
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
 
     return () => abortController.abort();

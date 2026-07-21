@@ -6,6 +6,8 @@ import { validateBody, couponCreateSchema } from "@/lib/schemas";
 
 export async function GET(request: NextRequest) {
   try {
+    const guard = await adminGuard();
+    if (guard) return guard;
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") ?? "1", 10);
     const limit = parseInt(searchParams.get("limit") ?? "20", 10);
@@ -26,11 +28,11 @@ export async function POST(request: NextRequest) {
     const coupon = await couponRepo.create({
       code: data!.code,
       type: data!.type,
-      value: Number(data!.value),
-      minOrder: data!.minOrder ? Number(data!.minOrder) : 0,
-      maxDiscount: data!.maxDiscount ? Number(data!.maxDiscount) : undefined,
-      usageLimit: data!.usageLimit ? Number(data!.usageLimit) : undefined,
-      perUserLimit: data!.perUserLimit ? Number(data!.perUserLimit) : undefined,
+      value: data!.value,
+      minOrder: data!.minOrder ?? 0,
+      maxDiscount: data!.maxDiscount,
+      usageLimit: data!.usageLimit,
+      perUserLimit: data!.perUserLimit,
       startDate: new Date(data!.startDate),
       endDate: data!.endDate ? new Date(data!.endDate) : undefined,
     });

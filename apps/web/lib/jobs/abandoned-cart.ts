@@ -11,7 +11,7 @@ abandonedCartQueue.process(async () => {
     where: {
       updatedAt: { lte: cutoff },
       items: { some: {} },
-      user: { orders: { none: {} } },
+      user: { orders: { none: { createdAt: { gte: cutoff } } } },
     },
     include: { items: true, user: { select: { email: true, name: true } } },
   });

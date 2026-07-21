@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VariantManager, type Variant } from "@/components/admin/products/variant-manager";
@@ -59,7 +60,11 @@ export function ProductForm({ slug }: Props) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      toast.success(isEdit ? "Product updated" : "Product created");
       router.push("/admin/products");
+    },
+    onError: () => {
+      toast.error("Failed to save product");
     },
   });
 

@@ -44,6 +44,7 @@ export default function ProductDetailPage({ params }: Props) {
   if (!product) { notFound(); return null; }
 
   const selectedVariant = product.variants.find((v: any) => v.id === selectedVariantId);
+  const minPrice = product.variants.length > 0 ? Math.min(...product.variants.map((v: any) => v.price)) : 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
@@ -66,7 +67,7 @@ export default function ProductDetailPage({ params }: Props) {
             )}
           </div>
           <PriceDisplay
-            price={selectedVariant ? selectedVariant.price : Math.min(...product.variants.map((v: any) => v.price))}
+            price={selectedVariant ? selectedVariant.price : minPrice}
             size="lg"
           />
           {product.variants.length > 1 && (
@@ -79,7 +80,7 @@ export default function ProductDetailPage({ params }: Props) {
             variantId={selectedVariant?.id ?? product.variants[0]?.id}
             title={product.title}
             image={product.images[0]?.url ?? ""}
-            price={selectedVariant ? selectedVariant.price : Math.min(...product.variants.map((v: any) => v.price))}
+            price={selectedVariant ? selectedVariant.price : minPrice}
             size={selectedVariant?.size ?? product.variants[0]?.size ?? ""}
             color={selectedVariant?.color ?? product.variants[0]?.color ?? ""}
             slug={product.slug}

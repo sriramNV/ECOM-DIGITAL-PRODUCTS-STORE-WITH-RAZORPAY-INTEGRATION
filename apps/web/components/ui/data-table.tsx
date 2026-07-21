@@ -27,7 +27,7 @@ export function DataTable<T extends Record<string, unknown>>({ columns, data, on
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.length === 0 ? (
+        {!Array.isArray(data) || data.length === 0 ? (
           <TableRow>
             <TableCell colSpan={columns.length} className="text-center text-foreground-muted py-8">
               No results found.

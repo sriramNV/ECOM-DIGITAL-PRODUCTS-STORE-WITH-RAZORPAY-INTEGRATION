@@ -10,6 +10,7 @@ export type Variant = {
   color: string;
   colorHex: string;
   price: number;
+  stock: number;
 };
 
 type Props = {
@@ -21,7 +22,7 @@ export function VariantManager({ variants, onChange }: Props) {
   function addVariant() {
     onChange([
       ...variants,
-      { title: "", size: "", color: "", colorHex: "#000000", price: 0 },
+      { title: "", size: "", color: "", colorHex: "#000000", price: 0, stock: 999 },
     ]);
   }
 
@@ -47,38 +48,52 @@ export function VariantManager({ variants, onChange }: Props) {
       {variants.length === 0 && (
         <p className="text-sm text-muted-foreground">No variants added yet.</p>
       )}
+      <div className="grid grid-cols-[1fr_80px_120px_40px_100px_80px_auto] gap-2 text-xs font-medium text-muted-foreground px-1">
+        <span>Title</span>
+        <span>Size</span>
+        <span>Color</span>
+        <span>Hex</span>
+        <span>Price</span>
+        <span>Stock</span>
+        <span></span>
+      </div>
       {variants.map((variant, i) => (
-        <div key={i} className="flex gap-2 items-center">
+        <div key={i} className="grid grid-cols-[1fr_80px_120px_40px_100px_80px_auto] gap-2 items-center">
           <Input
-            placeholder="Title"
+            placeholder="e.g. Small Black"
             value={variant.title}
             onChange={(e) => updateVariant(i, "title", e.target.value)}
-            className="flex-1"
           />
           <Input
-            placeholder="Size"
+            placeholder="S, M, L"
             value={variant.size}
             onChange={(e) => updateVariant(i, "size", e.target.value)}
-            className="w-20"
           />
           <Input
-            placeholder="Color"
+            placeholder="Black"
             value={variant.color}
             onChange={(e) => updateVariant(i, "color", e.target.value)}
-            className="w-24"
           />
           <Input
             type="color"
             value={variant.colorHex}
             onChange={(e) => updateVariant(i, "colorHex", e.target.value)}
-            className="w-10 h-8 p-0.5"
+            className="h-8 p-0.5"
           />
           <Input
             type="number"
-            placeholder="Price"
+            step="0.01"
+            min="0"
+            placeholder="299.00"
             value={variant.price}
             onChange={(e) => updateVariant(i, "price", Number(e.target.value))}
-            className="w-24"
+          />
+          <Input
+            type="number"
+            min="0"
+            placeholder="999"
+            value={variant.stock}
+            onChange={(e) => updateVariant(i, "stock", Number(e.target.value))}
           />
           <Button
             type="button"

@@ -15,11 +15,13 @@ export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 export type { CartItem } from "./cart";
 
 export type Address = {
-  name: string;
-  street: string;
+  fullName: string;
+  addressLine1: string;
+  addressLine2?: string;
   city: string;
   state: string;
   pincode: string;
   country: string;
   phone: string;
+  email?: string;
 };

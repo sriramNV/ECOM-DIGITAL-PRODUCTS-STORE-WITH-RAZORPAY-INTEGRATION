@@ -7,7 +7,7 @@ type ListOptions = {
   category?: string;
   search?: string;
   sort?: "price_asc" | "price_desc" | "newest" | "name";
-  isActive?: boolean;
+  isActive?: boolean | "all";
 };
 
 type ListResult = {
@@ -30,10 +30,11 @@ type ListResult = {
 
 export const productRepo = {
   async list(options: ListOptions = {}): Promise<ListResult> {
-    const { page = 1, limit = 20, category, search, sort = "newest", isActive = true } = options;
+    const { page = 1, limit = 20, category, search, sort = "newest", isActive } = options;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = { isActive };
+    const where: Prisma.ProductWhereInput = {};
+    if (isActive !== undefined && isActive !== "all") where.isActive = isActive;
 
     if (category) {
       where.category = { slug: category };
@@ -92,7 +93,7 @@ export const productRepo = {
 
   async getBySlug(slug: string) {
     const product = await prisma.product.findFirst({
-      where: { slug, isActive: true },
+      where: { slug },
       include: {
         category: true,
         variants: { where: { isEnabled: true }, orderBy: { title: "asc" } },
@@ -128,5 +129,91 @@ export const productRepo = {
       marginPercent: Number(p.marginPercent),
       variants: p.variants.map((v) => ({ ...v, price: Number(v.price) })),
     }));
+  },
+
+  async create(data: {
+    title: string;
+    description: string;
+    basePrice: number;
+    marginPercent?: number;
+    slug: string;
+    categoryId?: string | null;
+    images?: { url: string; alt?: string; position?: number }[];
+    variants?: { title: string; price: number; size?: string; color?: string; colorHex?: string; stock?: number }[];
+  }) {
+    return prisma.product.create({
+      data: {
+        title: data.title,
+        slug: data.slug,
+        description: data.description,
+        basePrice: data.basePrice,
+        marginPercent: data.marginPercent ?? 0,
+        categoryId: data.categoryId || null,
+        images: data.images?.length
+          ? { create: data.images.map((img, i) => ({ url: img.url, alt: img.alt, position: img.position ?? i })) }
+          : undefined,
+        variants: data.variants?.length
+          ? { create: data.variants.map((v) => ({ title: v.title, price: v.price, size: v.size, color: v.color, colorHex: v.colorHex, stock: v.stock ?? 999 })) }
+          : undefined,
+      },
+    });
+  },
+
+  async update(id: string, data: {
+    title?: string;
+    description?: string;
+    basePrice?: number;
+    marginPercent?: number;
+    slug?: string;
+    isActive?: boolean;
+    isFeatured?: boolean;
+    categoryId?: string | null;
+    images?: { url: string; alt?: string; position?: number }[];
+    variants?: { id?: string; title: string; price: number; size?: string; color?: string; colorHex?: string; stock?: number; isEnabled?: boolean }[];
+  }) {
+    const updateData: Prisma.ProductUpdateInput = {};
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.slug !== undefined) updateData.slug = data.slug;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.basePrice !== undefined) updateData.basePrice = data.basePrice;
+    if (data.marginPercent !== undefined) updateData.marginPercent = data.marginPercent;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.isFeatured !== undefined) updateData.isFeatured = data.isFeatured;
+    if (data.categoryId !== undefined) {
+      updateData.category = data.categoryId
+        ? { connect: { id: data.categoryId } }
+        : { disconnect: true };
+    }
+
+    return prisma.$transaction(async (tx) => {
+      if (data.images) {
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        if (data.images.length > 0) {
+          await tx.productImage.createMany({
+            data: data.images.map((img, i) => ({ productId: id, url: img.url, alt: img.alt, position: img.position ?? i })),
+          });
+        }
+      }
+      if (data.variants) {
+        const submittedIds = data.variants.filter((v) => v.id).map((v) => v.id!);
+        await tx.productVariant.updateMany({
+          where: { productId: id, id: { notIn: submittedIds } },
+          data: { isEnabled: false },
+        });
+        for (const v of data.variants) {
+          if (v.id) {
+            await tx.productVariant.update({
+              where: { id: v.id },
+              data: { title: v.title, price: v.price, size: v.size, color: v.color, colorHex: v.colorHex, stock: v.stock ?? 999, isEnabled: v.isEnabled ?? true },
+            });
+          } else {
+            await tx.productVariant.create({
+              data: { productId: id, title: v.title, price: v.price, size: v.size, color: v.color, colorHex: v.colorHex, stock: v.stock ?? 999, isEnabled: v.isEnabled ?? true },
+            });
+          }
+        }
+      }
+      return tx.product.update({ where: { id }, data: updateData });
+    });
   },
 };

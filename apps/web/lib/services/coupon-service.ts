@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { calculateShipping } from "./pricing-service";
+import { logger } from "@/lib/logger";
 
 type CouponResult = {
   valid: boolean;
@@ -32,6 +34,13 @@ export const couponService = {
         }
       }
 
+      if (coupon.perUserLimit) {
+        const userUsageCount = await tx.order.count({ where: { couponId: coupon.id, userId } });
+        if (userUsageCount >= coupon.perUserLimit) {
+          return { valid: false, discount: 0, code, error: "Coupon per-user limit reached" };
+        }
+      }
+
       let discount = 0;
       if (coupon.type === "percentage") {
         discount = Math.round((subtotal * Number(coupon.value)) / 100);
@@ -41,7 +50,10 @@ export const couponService = {
       } else if (coupon.type === "fixed") {
         discount = Number(coupon.value);
       } else if (coupon.type === "free_shipping") {
-        discount = 0;
+        discount = calculateShipping(subtotal);
+      } else {
+        logger.warn({ type: coupon.type }, "Unknown coupon type applied");
+        return { valid: false, discount: 0, code, error: "Invalid coupon type" };
       }
 
       return { valid: true, discount, code: coupon.code };

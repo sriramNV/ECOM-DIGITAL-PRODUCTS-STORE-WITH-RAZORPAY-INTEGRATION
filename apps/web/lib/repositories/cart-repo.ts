@@ -34,7 +34,7 @@ export const cartRepo = {
     }
 
     return prisma.cartItem.create({
-      data: { cartId: cart.id, productId, variantId, quantity },
+      data: { cartId: cart.id, productId, variantId, quantity: Math.min(quantity, 10) },
     });
   },
 
@@ -75,7 +75,7 @@ export const cartRepo = {
             cartId: cart.id,
             productId: guest.productId,
             variantId: guest.variantId,
-            quantity: guest.quantity,
+            quantity: Math.min(guest.quantity, 10),
           },
         });
       }

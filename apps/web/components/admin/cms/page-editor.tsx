@@ -51,9 +51,12 @@ export function PageEditor() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [activeTab, setActiveTab] = useState<"edit" | "blocks">("edit");
 
-  const { data: pages, isLoading } = useQuery({
+  const { data: pages, isLoading } = useQuery<Page[]>({
     queryKey: ["cms-pages"],
-    queryFn: () => fetch("/api/cms/pages").then((r) => r.json()),
+    queryFn: () =>
+      fetch("/api/cms/pages")
+        .then((r) => r.json())
+        .then((data) => (Array.isArray(data) ? data : data.pages ?? [])),
   });
 
   const mutation = useMutation({
