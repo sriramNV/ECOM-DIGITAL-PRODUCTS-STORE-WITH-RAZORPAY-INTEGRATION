@@ -16,6 +16,11 @@ export const cartRepo = {
   },
 
   async addItem(userId: string, productId: string, variantId: string, quantity: number) {
+    const variant = await prisma.productVariant.findFirst({
+      where: { id: variantId, product: { isActive: true, id: productId } },
+    });
+    if (!variant) throw new Error("Product variant not found or inactive");
+
     const cart = await prisma.cart.upsert({
       where: { userId },
       create: { userId },
@@ -59,27 +64,31 @@ export const cartRepo = {
       update: {},
     });
 
-    for (const guest of guestItems) {
-      const existing = await prisma.cartItem.findFirst({
-        where: { cartId: cart.id, variantId: guest.variantId },
-      });
+    const existingItems = await prisma.cartItem.findMany({
+      where: { cartId: cart.id, variantId: { in: guestItems.map((g) => g.variantId) } },
+    });
+    const existingMap = new Map(existingItems.map((e) => [e.variantId, e]));
 
-      if (existing) {
-        await prisma.cartItem.update({
-          where: { id: existing.id },
-          data: { quantity: Math.min(existing.quantity + guest.quantity, 10) },
-        });
-      } else {
-        await prisma.cartItem.create({
-          data: {
-            cartId: cart.id,
-            productId: guest.productId,
-            variantId: guest.variantId,
-            quantity: Math.min(guest.quantity, 10),
-          },
-        });
+    await prisma.$transaction(async (tx) => {
+      for (const guest of guestItems) {
+        const existing = existingMap.get(guest.variantId);
+        if (existing) {
+          await tx.cartItem.update({
+            where: { id: existing.id },
+            data: { quantity: Math.min(existing.quantity + guest.quantity, 10) },
+          });
+        } else {
+          await tx.cartItem.create({
+            data: {
+              cartId: cart.id,
+              productId: guest.productId,
+              variantId: guest.variantId,
+              quantity: Math.min(guest.quantity, 10),
+            },
+          });
+        }
       }
-    }
+    });
 
     return cartRepo.getByUserId(userId);
   },

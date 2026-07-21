@@ -4,8 +4,9 @@ import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
-  if (!forwarded.startsWith("127.") && !forwarded.startsWith("10.") && !forwarded.startsWith("192.168.") && !forwarded.startsWith("172.")) {
+  const healthToken = request.headers.get("x-health-token") ?? request.nextUrl.searchParams.get("token");
+  const expectedToken = process.env.HEALTH_CHECK_TOKEN;
+  if (expectedToken && healthToken !== expectedToken) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

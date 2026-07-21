@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { redis } from "@/lib/redis";
+import { logger } from "@/lib/logger";
 import { fulfillmentService } from "@/lib/services/fulfillment-service";
 import { handleApiError } from "@/lib/api-error-handler";
 
@@ -28,16 +29,19 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(body);
-    const eventId = `${event.event}:${event.data?.order_id ?? Date.now()}`;
+    const orderId = event.data?.order_id;
+    if (!orderId) {
+      logger.warn({ event: event.event }, "Printify webhook missing order_id, skipping dedup");
+    }
+    const eventId = `${event.event}:${orderId ?? event.data?.external_id ?? Date.now()}`;
 
-    const processed = await redis.get(`printify-webhook:${eventId}`);
-    if (processed) {
+    const dedupKey = `printify-webhook:${eventId}`;
+    const alreadyProcessed = await redis.set(dedupKey, "1", "EX", 86400, "NX");
+    if (!alreadyProcessed) {
       return NextResponse.json({ status: "already_processed" });
     }
 
     await fulfillmentService.handleWebhook(event, signature, body);
-
-    await redis.set(`printify-webhook:${eventId}`, "1", "EX", 86400);
 
     return NextResponse.json({ status: "ok" });
   } catch (error) {

@@ -12,8 +12,14 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const signature = request.headers.get("x-razorpay-signature");
 
+    if (!signature) {
+      return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+    }
     const expected = crypto.createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
-    if (signature !== expected) {
+    const sigBuf = Buffer.from(signature, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    const safe = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
+    if (!safe) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 

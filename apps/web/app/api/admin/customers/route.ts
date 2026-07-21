@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
             ]
           : undefined,
       },
-      include: {
+      select: {
+        id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true,
         _count: { select: { orders: true } },
         orders: { take: 1, orderBy: { createdAt: "desc" }, select: { totalAmount: true, createdAt: true } },
       },

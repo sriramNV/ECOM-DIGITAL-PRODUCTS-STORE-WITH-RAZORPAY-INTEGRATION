@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 async function rateLimit(ip: string, maxRequests: number, windowMs: number): Promise<boolean> {
   try {
@@ -9,7 +10,8 @@ async function rateLimit(ip: string, maxRequests: number, windowMs: number): Pro
     if (current === 1) await redis.expire(key, Math.floor(windowMs / 1000));
     return current <= maxRequests;
   } catch {
-    return true;
+    logger.warn({ maxRequests, windowMs }, "Rate limiting unavailable - blocking request");
+    return false;
   }
 }
 
@@ -19,7 +21,8 @@ export default auth(async (req) => {
   const isAdmin = req.auth?.user?.role === "ADMIN";
 
   if (pathname.startsWith("/api/")) {
-    const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+    const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
+    const ip = forwardedFor.split(",").pop()?.trim() || req.headers.get("x-real-ip") || "unknown";
     const allowed = await rateLimit(ip, 100, 60000);
     if (!allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });

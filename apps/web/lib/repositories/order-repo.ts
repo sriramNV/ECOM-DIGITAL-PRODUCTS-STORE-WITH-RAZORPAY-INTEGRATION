@@ -69,22 +69,24 @@ export const orderRepo = {
       CANCELLED: ["REFUNDED"],
     };
 
-    const currentOrder = await prisma.order.findUnique({ where: { id }, select: { status: true } });
-    if (!currentOrder) throw new Error("Order not found");
-    const allowed = allowedTransitions[currentOrder.status as string];
-    if (allowed && !allowed.includes(status)) {
-      throw new Error(`Cannot transition order from ${currentOrder.status} to ${status}`);
-    }
+    return prisma.$transaction(async (tx) => {
+      const currentOrder = await tx.order.findUnique({ where: { id }, select: { status: true } });
+      if (!currentOrder) throw new Error("Order not found");
+      const allowed = allowedTransitions[currentOrder.status as string];
+      if (allowed && !allowed.includes(status)) {
+        throw new Error(`Cannot transition order from ${currentOrder.status} to ${status}`);
+      }
 
-    const order = await prisma.order.update({
-      where: { id },
-      data: { status: status as OrderStatus },
+      const order = await tx.order.update({
+        where: { id },
+        data: { status: status as OrderStatus },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: { orderId: id, status: status as OrderStatus, note },
+      });
+
+      return order;
     });
-
-    await prisma.orderStatusHistory.create({
-      data: { orderId: id, status: status as OrderStatus, note },
-    });
-
-    return order;
   },
 };

@@ -25,7 +25,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    await prisma.cartItem.delete({ where: { id } });
+    await prisma.cartItem.deleteMany({ where: { id, cartId: cart.id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     return handleApiError(error, "cart/items/[id] DELETE");

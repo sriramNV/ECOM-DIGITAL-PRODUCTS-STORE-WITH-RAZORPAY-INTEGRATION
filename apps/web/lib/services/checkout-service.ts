@@ -20,7 +20,7 @@ export const checkoutService = {
     if (shippingAddress) {
       const parsed = shippingAddressSchema.safeParse(shippingAddress);
       if (!parsed.success) {
-        throw new Error("Invalid shipping address: " + JSON.stringify(parsed.error.errors));
+        throw new Error("Invalid shipping address");
       }
     }
 
@@ -87,31 +87,22 @@ export const checkoutService = {
       .update(`${orderId}|${paymentId}`)
       .digest("hex");
 
-    if (expected !== signature) {
+    const sigBuf = Buffer.from(signature, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    const safe = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
+    if (!safe) {
       throw new Error("Invalid payment signature");
     }
 
-    if (shippingAddress) {
-      const parsed = shippingAddressSchema.safeParse(shippingAddress);
-      if (!parsed.success) {
-        throw new Error("Invalid shipping address");
-      }
-    }
-
     const rzpOrder = await razorpay.orders.fetch(orderId);
-    if (rzpOrder.status === "paid") {
-      throw new Error("Order already paid");
+    const payment = await razorpay.payments.fetch(paymentId);
+    if (payment.status !== "captured") {
+      throw new Error("Payment not yet captured - try again");
     }
 
     const cart = await cartRepo.getByUserId(userId);
     if (!cart || cart.items.length === 0) {
       throw new Error("Cart is empty");
-    }
-
-    for (const item of cart.items) {
-      if (item.variant.stock != null && item.variant.stock < item.quantity) {
-        throw new Error(`Insufficient stock for ${item.product?.title ?? "item"}`);
-      }
     }
 
     const existingPayment = await prisma.payment.findFirst({
@@ -137,11 +128,13 @@ export const checkoutService = {
     let discount = 0;
     let appliedCouponId: string | undefined;
     if (couponCode) {
-      discount = Number(rzpOrder.notes?.discount) || 0;
-      appliedCouponId = rzpOrder.notes?.appliedCouponId as string | undefined;
-      if (!appliedCouponId) {
-        const coupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
-        appliedCouponId = coupon?.id;
+      const currentCoupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
+      if (currentCoupon) {
+        const result = await couponService.validateAndApply(couponCode, subtotal, userId);
+        if (result.valid) {
+          discount = result.discount;
+          appliedCouponId = currentCoupon.id;
+        }
       }
     }
 
@@ -152,74 +145,89 @@ export const checkoutService = {
       throw new Error("Payment amount mismatch - possible tampering detected");
     }
 
-    // Remove couponCode from stored address to avoid leaking internal fields
-    const { couponCode: _, ...cleanAddress } = (shippingAddress ?? {}) as Record<string, unknown>;
-    const sanitizedAddress = Object.fromEntries(
-      Object.entries(cleanAddress).filter(([_, v]) => typeof v !== "undefined")
-    );
+    // Use validated shipping address data instead of raw input
+    const sanitizedAddress: Record<string, unknown> = {};
+    if (shippingAddress) {
+      const parsed = shippingAddressSchema.safeParse(shippingAddress);
+      if (!parsed.success) {
+        throw new Error("Invalid shipping address");
+      }
+      Object.assign(sanitizedAddress, parsed.data);
+    }
 
     const orderNumber = await generateOrderNumber();
 
-    const order = await prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({
-        data: {
-          orderNumber,
-          userId,
-          status: "PAID",
-          totalAmount: total,
-          subtotalAmount: subtotal,
-          shippingAmount: shipping,
-          taxAmount: tax,
-          taxRate: 18,
-          discountAmount: discount,
-          couponId: appliedCouponId,
-          currency: "INR",
-          shippingAddress: sanitizedAddress as any,
-          payments: {
-            create: {
-              razorpayPaymentId: paymentId,
-              razorpayOrderId: orderId,
-              razorpaySignature: signature,
-              amount: total,
-              status: "COMPLETED",
+    let order;
+    try {
+      order = await prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNumber,
+            userId,
+            status: "PAID",
+            totalAmount: total,
+            subtotalAmount: subtotal,
+            shippingAmount: shipping,
+            taxAmount: tax,
+            taxRate: 18,
+            discountAmount: discount,
+            couponId: appliedCouponId,
+            currency: "INR",
+            shippingAddress: sanitizedAddress as any,
+            payments: {
+              create: {
+                razorpayPaymentId: paymentId,
+                razorpayOrderId: orderId,
+                razorpaySignature: signature,
+                amount: total,
+                status: "COMPLETED",
+              },
+            },
+            items: {
+              create: cart.items.map((ci) => ({
+                productId: ci.productId,
+                variantId: ci.variantId,
+                title: ci.product.title,
+                variant: ci.variant.title,
+                quantity: ci.quantity,
+                unitPrice: Number(ci.variant.price),
+                totalPrice: Number(ci.variant.price) * ci.quantity,
+              })),
+            },
+            statusHistory: {
+              create: { status: "PAID" },
             },
           },
-          items: {
-            create: cart.items.map((ci) => ({
-              productId: ci.productId,
-              variantId: ci.variantId,
-              title: ci.product.title,
-              variant: ci.variant.title,
-              quantity: ci.quantity,
-              unitPrice: Number(ci.variant.price),
-              totalPrice: Number(ci.variant.price) * ci.quantity,
-            })),
-          },
-          statusHistory: {
-            create: { status: "PAID" },
-          },
-        },
-        include: { items: true },
-      });
-
-      for (const item of cart.items) {
-        await tx.productVariant.update({
-          where: { id: item.variantId, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
+          include: { items: true },
         });
-      }
 
-      return created;
-    });
+        for (const item of cart.items) {
+          const result = await tx.productVariant.updateMany({
+            where: { id: item.variantId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (result.count === 0) {
+            throw new Error(`Insufficient stock for ${item.product?.title ?? "item"}`);
+          }
+        }
+
+        return created;
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("Insufficient stock")) {
+        throw err;
+      }
+      throw new Error("Failed to create order - please try again");
+    }
 
     logger.info({ orderId: order.id, orderNumber }, "Order created after payment");
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
     if (user) {
-      emailService.sendOrderConfirmation(order as any, user as any).catch(logger.error);
+      emailService.sendOrderConfirmation(order as any, user as any).catch((err: unknown) => logger.error({ err }, "Failed to send order confirmation"));
     }
 
-    fulfillmentService.submitOrder(order.id).catch(logger.error);
+    fulfillmentService.submitOrder(order.id).catch((err: unknown) => logger.error({ err }, "Failed to submit order to fulfillment"));
 
     await cartRepo.clearCart(userId);
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { orderRepo } from "@/lib/repositories/order-repo";
 import { fulfillmentService } from "@/lib/services/fulfillment-service";
 import { adminGuard } from "@/lib/admin-guard";
@@ -40,12 +41,17 @@ export async function PATCH(
     }
 
     switch (data!.action) {
-      case "submit_to_printify":
-        if (order.status !== "PAID") {
-          return NextResponse.json({ error: "Order must be PAID to submit to Printify" }, { status: 400 });
+      case "submit_to_printify": {
+        const updated = await prisma.order.updateMany({
+          where: { id, status: "PAID", printifyOrderId: null },
+          data: { status: "PROCESSING" },
+        });
+        if (updated.count === 0) {
+          return NextResponse.json({ error: "Order cannot be submitted to Printify (already processing or submitted)" }, { status: 400 });
         }
         await fulfillmentService.submitOrder(id);
         break;
+      }
       case "cancel":
         if (!["PAID", "PROCESSING", "PRINTING"].includes(order.status)) {
           return NextResponse.json({ error: "Order cannot be cancelled in current status" }, { status: 400 });

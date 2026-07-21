@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { CouponType } from "@prisma/client";
 
 export const couponRepo = {
   async list(page = 1, limit = 20) {
@@ -15,7 +16,7 @@ export const couponRepo = {
   },
 
   async create(data: {
-    code: string; type: string; value: number; minOrder?: number;
+    code: string; type: CouponType; value: number; minOrder?: number;
     maxDiscount?: number; usageLimit?: number; perUserLimit?: number;
     startDate: Date; endDate?: Date;
   }) {

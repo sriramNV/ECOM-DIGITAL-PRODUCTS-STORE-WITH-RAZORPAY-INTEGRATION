@@ -199,6 +199,10 @@ model Order {
   payments      Payment[]
   statusHistory OrderStatusHistory[]
   coupon        Coupon?           @relation(fields: [couponId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -228,6 +232,8 @@ model Payment {
   createdAt         DateTime      @default(now())
 
   order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }
 
 model OrderStatusHistory {
@@ -238,21 +244,30 @@ model OrderStatusHistory {
   createdAt DateTime    @default(now())
 
   order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+enum CouponType {
+  percentage
+  fixed
+  free_shipping
 }
 
 model Coupon {
-  id            String    @id @default(cuid())
-  code          String    @unique
-  type          String
+  id            String      @id @default(cuid())
+  code          String      @unique
+  type          CouponType
   value         Decimal
-  minOrder      Decimal   @default(0)
+  minOrder      Decimal     @default(0)
   maxDiscount   Decimal?
   usageLimit    Int?
   perUserLimit  Int?
   startDate     DateTime
   endDate       DateTime?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
 
   orders Order[]
 }
@@ -313,6 +328,10 @@ model EmailLog {
   status    String
   error     String?
   createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model AuditLog {
@@ -324,4 +343,8 @@ model AuditLog {
   metadata  Json?
   ip        String?
   createdAt DateTime @default(now())
+
+  @@index([action, entity])
+  @@index([userId])
+  @@index([createdAt])
 }
