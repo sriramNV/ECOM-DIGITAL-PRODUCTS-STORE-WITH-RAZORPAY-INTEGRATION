@@ -45,6 +45,7 @@ export function Pagination({ currentPage, totalPages }: Props) {
             <button
               key={page}
               onClick={() => goToPage(page)}
+              aria-current={page === currentPage ? "page" : undefined}
               className={`px-3 py-2 text-sm rounded-md border ${
                 page === currentPage
                   ? "bg-accent text-accent-foreground border-accent"

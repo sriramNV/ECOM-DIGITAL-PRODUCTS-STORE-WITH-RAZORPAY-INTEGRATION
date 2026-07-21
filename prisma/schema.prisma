@@ -231,7 +231,7 @@ model Payment {
   method            String?
   createdAt         DateTime      @default(now())
 
-  order Order @relation(fields: [orderId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }
@@ -243,7 +243,7 @@ model OrderStatusHistory {
   note      String?
   createdAt DateTime    @default(now())
 
-  order Order @relation(fields: [orderId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([createdAt])

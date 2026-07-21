@@ -4,6 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, "http://localhost");
+    return parsed.protocol === "http:" || parsed.protocol === "https:" || url.startsWith("/");
+  } catch {
+    return url.startsWith("/");
+  }
+}
+
 type HeroContent = {
   heading?: string;
   subtitle?: string;
@@ -41,7 +50,7 @@ export function HeroBlock({ content }: Props) {
           {subtitle && (
             <p className="text-lg md:text-xl text-white/80 mt-4 max-w-xl">{subtitle}</p>
           )}
-          {ctaText && ctaLink && (
+          {ctaText && ctaLink && isSafeUrl(ctaLink) && (
             <Link href={ctaLink}>
               <Button size="lg" className="mt-8">{ctaText}</Button>
             </Link>

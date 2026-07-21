@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -9,14 +9,22 @@ type NewsletterBlockProps = {
 };
 
 export function NewsletterBlock({ content: _content }: NewsletterBlockProps) {
+  const abortRef = useRef<AbortController | null>(null);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     try {
       const res = await fetch("/api/newsletter/subscribe", {
+        signal: abortRef.current.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

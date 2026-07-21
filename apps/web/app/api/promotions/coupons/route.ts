@@ -3,6 +3,8 @@ import { couponRepo } from "@/lib/repositories/coupon-repo";
 import { adminGuard } from "@/lib/admin-guard";
 import { handleApiError } from "@/lib/api-error-handler";
 import { validateBody, couponCreateSchema } from "@/lib/schemas";
+import { auth } from "@/lib/auth";
+import { auditLogRepo } from "@/lib/repositories/audit-log-repo";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,6 +38,10 @@ export async function POST(request: NextRequest) {
       startDate: new Date(data!.startDate),
       endDate: data!.endDate ? new Date(data!.endDate) : undefined,
     });
+
+    const session = await auth();
+    await auditLogRepo.log({ userId: session!.user.id, action: "CREATE", entity: "Coupon", entityId: coupon.id });
+
     return NextResponse.json(coupon, { status: 201 });
   } catch (error) {
     return handleApiError(error, "promotions/coupons POST");

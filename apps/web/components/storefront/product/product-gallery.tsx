@@ -43,6 +43,7 @@ export function ProductGallery({ images }: Props) {
             <button
               key={index}
               onClick={() => setSelectedIndex(index)}
+              aria-label={"Select image " + (index + 1)}
               className={`relative w-16 h-16 flex-shrink-0 rounded-md overflow-hidden border-2 transition-colors ${
                 index === selectedIndex ? "border-accent" : "border-border hover:border-foreground-faint"
               }`}

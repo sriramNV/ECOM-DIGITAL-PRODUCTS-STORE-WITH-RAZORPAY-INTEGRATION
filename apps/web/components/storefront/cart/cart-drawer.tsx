@@ -22,6 +22,21 @@ export function CartDrawer({ open, onClose }: Props) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const focusable = document.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", handleTab);
+    setTimeout(() => { const first = document.querySelector('[aria-label="Close cart"]') as HTMLElement; first?.focus(); }, 100);
+    return () => document.removeEventListener("keydown", handleTab);
+  }, [open]);
+
   return (
     <>
       {open && (

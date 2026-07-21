@@ -91,7 +91,11 @@ export function RazorpayButton({ shippingAddress, disabled, couponCode }: Props)
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
-      setError((err as Error).message);
+      if ((err as Error).message?.includes("Failed to create order") || (err as Error).message?.includes("Payment")) {
+        setError((err as Error).message);
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
       setLoading(false);
     }
   }

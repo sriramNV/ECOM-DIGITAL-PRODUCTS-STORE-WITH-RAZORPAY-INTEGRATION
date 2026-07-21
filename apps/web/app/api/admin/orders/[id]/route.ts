@@ -5,6 +5,8 @@ import { fulfillmentService } from "@/lib/services/fulfillment-service";
 import { adminGuard } from "@/lib/admin-guard";
 import { handleApiError } from "@/lib/api-error-handler";
 import { validateBody, adminOrderActionSchema } from "@/lib/schemas";
+import { auth } from "@/lib/auth";
+import { auditLogRepo } from "@/lib/repositories/audit-log-repo";
 
 export async function GET(
   _request: NextRequest,
@@ -65,6 +67,9 @@ export async function PATCH(
         await orderRepo.updateStatus(id, "DELIVERED");
         break;
     }
+
+    const session = await auth();
+    await auditLogRepo.log({ userId: session!.user.id, action: "UPDATE", entity: "Order", entityId: id, metadata: { action: data!.action } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

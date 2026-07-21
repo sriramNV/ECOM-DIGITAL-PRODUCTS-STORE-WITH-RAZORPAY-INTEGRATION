@@ -62,6 +62,7 @@ export function AuditLogViewer() {
             className="w-56"
           />
           <select
+            aria-label="Filter by action"
             value={action}
             onChange={(e) => { setAction(e.target.value); setPage(1); }}
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"

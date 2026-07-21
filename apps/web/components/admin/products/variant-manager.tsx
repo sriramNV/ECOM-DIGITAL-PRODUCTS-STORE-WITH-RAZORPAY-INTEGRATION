@@ -100,6 +100,7 @@ export function VariantManager({ variants, onChange }: Props) {
             variant="ghost"
             size="icon-sm"
             onClick={() => removeVariant(i)}
+            aria-label={"Remove " + (variant.title || "variant")}
           >
             ✕
           </Button>

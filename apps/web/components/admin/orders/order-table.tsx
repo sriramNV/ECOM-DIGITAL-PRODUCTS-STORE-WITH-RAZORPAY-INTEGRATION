@@ -36,11 +36,13 @@ export function OrderTable() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const limit = 20;
 
   useEffect(() => {
     const abortController = new AbortController();
+    setError(null);
     setLoading(true);
     const params = new URLSearchParams();
     params.set("limit", String(limit));
@@ -55,7 +57,11 @@ export function OrderTable() {
         setTotal(data.total ?? 0);
         setTotalPages(data.totalPages ?? 1);
       })
-      .catch(() => {})
+      .catch((err) => {
+        if ((err as Error).name !== "AbortError") {
+          setError("Failed to load orders");
+        }
+      })
       .finally(() => setLoading(false));
 
     return () => abortController.abort();
@@ -73,6 +79,7 @@ export function OrderTable() {
             className="w-72"
           />
           <select
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
@@ -84,7 +91,11 @@ export function OrderTable() {
         </div>
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="rounded-lg bg-error-bg border border-error/20 p-4 mb-4">
+          <p className="text-sm text-error">{error}</p>
+        </div>
+      ) : loading ? (
         <p className="text-foreground-muted py-8 text-center">Loading…</p>
       ) : (
         <>

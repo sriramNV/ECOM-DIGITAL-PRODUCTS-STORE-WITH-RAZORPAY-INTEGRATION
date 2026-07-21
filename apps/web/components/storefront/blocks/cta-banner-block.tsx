@@ -2,6 +2,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, "http://localhost");
+    return parsed.protocol === "http:" || parsed.protocol === "https:" || url.startsWith("/");
+  } catch {
+    return url.startsWith("/");
+  }
+}
+
 type CtaBannerContent = {
   heading?: string;
   body?: string;
@@ -38,7 +47,7 @@ export function CtaBannerBlock({ content }: Props) {
         {body && (
           <p className="text-lg text-white/80 mt-4 max-w-2xl mx-auto">{body}</p>
         )}
-        {buttonText && buttonLink && (
+        {buttonText && buttonLink && isSafeUrl(buttonLink) && (
           <Link href={buttonLink}>
             <Button size="lg" className="mt-8">{buttonText}</Button>
           </Link>

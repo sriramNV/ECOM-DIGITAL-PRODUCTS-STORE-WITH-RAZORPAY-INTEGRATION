@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -55,7 +56,7 @@ export function CouponForm({ open, onClose }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (endDate && new Date(endDate) < new Date(startDate)) {
-      alert("End date must be on or after the start date.");
+      toast.error("End date must be on or after the start date.");
       return;
     }
     mutation.mutate({

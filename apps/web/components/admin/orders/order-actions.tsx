@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
@@ -26,7 +27,7 @@ export function OrderActions({ orderId, status }: Props) {
         throw new Error(data.error ?? "Failed to update order");
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update order");
+      toast.error(err instanceof Error ? err.message : "Failed to update order");
     }
     setLoading(null);
     router.refresh();

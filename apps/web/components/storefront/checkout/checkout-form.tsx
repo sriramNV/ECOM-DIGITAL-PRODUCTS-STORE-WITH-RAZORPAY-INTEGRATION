@@ -31,7 +31,11 @@ export function CheckoutForm() {
     country: "IN",
   });
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^\d{10}$/;
+  const pincodeRegex = /^\d{6}$/;
   const isComplete = address.fullName && address.email && address.phone && address.addressLine1 && address.city && address.state && address.pincode;
+  const isFormValid = isComplete && emailRegex.test(address.email) && phoneRegex.test(address.phone) && pincodeRegex.test(address.pincode);
 
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setAddress((prev) => ({ ...prev, [field]: e.target.value }));
@@ -47,32 +51,32 @@ export function CheckoutForm() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Full Name</label>
-              <Input placeholder="John Doe" value={address.fullName} onChange={update("fullName")} />
+              <label htmlFor="fullName" className="text-sm font-medium text-foreground">Full Name</label>
+              <Input id="fullName" placeholder="John Doe" value={address.fullName} onChange={update("fullName")} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Email</label>
-              <Input type="email" placeholder="john@example.com" value={address.email} onChange={update("email")} />
+              <label htmlFor="email" className="text-sm font-medium text-foreground">Email</label>
+              <Input id="email" type="email" placeholder="john@example.com" value={address.email} onChange={update("email")} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Phone</label>
-              <Input type="tel" placeholder="9876543210" value={address.phone} onChange={update("phone")} />
+              <label htmlFor="phone" className="text-sm font-medium text-foreground">Phone</label>
+              <Input id="phone" type="tel" placeholder="9876543210" value={address.phone} onChange={update("phone")} />
             </div>
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Address</label>
-              <Input placeholder="123 Main St" value={address.addressLine1} onChange={update("addressLine1")} />
+              <label htmlFor="addressLine1" className="text-sm font-medium text-foreground">Address</label>
+              <Input id="addressLine1" placeholder="123 Main St" value={address.addressLine1} onChange={update("addressLine1")} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">City</label>
-              <Input placeholder="Mumbai" value={address.city} onChange={update("city")} />
+              <label htmlFor="city" className="text-sm font-medium text-foreground">City</label>
+              <Input id="city" placeholder="Mumbai" value={address.city} onChange={update("city")} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">State</label>
-              <Input placeholder="Maharashtra" value={address.state} onChange={update("state")} />
+              <label htmlFor="state" className="text-sm font-medium text-foreground">State</label>
+              <Input id="state" placeholder="Maharashtra" value={address.state} onChange={update("state")} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Pincode</label>
-              <Input placeholder="400001" value={address.pincode} onChange={update("pincode")} />
+              <label htmlFor="pincode" className="text-sm font-medium text-foreground">Pincode</label>
+              <Input id="pincode" placeholder="400001" value={address.pincode} onChange={update("pincode")} />
             </div>
           </div>
         </div>
@@ -83,7 +87,7 @@ export function CheckoutForm() {
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-accent text-accent-foreground text-xs font-semibold">2</span>
             <h2 className="text-base font-semibold text-foreground">Payment</h2>
           </div>
-          <RazorpayButton shippingAddress={address as unknown as Record<string, unknown>} disabled={!isComplete} />
+          <RazorpayButton shippingAddress={address as unknown as Record<string, unknown>} disabled={!isFormValid} />
         </div>
       </div>
     </div>

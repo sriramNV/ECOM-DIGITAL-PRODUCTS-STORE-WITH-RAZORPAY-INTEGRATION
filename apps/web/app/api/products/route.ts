@@ -4,6 +4,8 @@ import { productRepo } from "@/lib/repositories/product-repo";
 import { adminGuard } from "@/lib/admin-guard";
 import { slugify } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { auth } from "@/lib/auth";
+import { auditLogRepo } from "@/lib/repositories/audit-log-repo";
 
 const querySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -60,6 +62,9 @@ export async function POST(request: NextRequest) {
     const slug = slugify(body.title);
 
     const product = await productRepo.create({ ...body, slug });
+
+    const session = await auth();
+    await auditLogRepo.log({ userId: session!.user.id, action: "CREATE", entity: "Product", entityId: product.id });
 
     return NextResponse.json(product, { status: 201 });
   } catch (error) {

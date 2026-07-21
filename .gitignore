@@ -8,3 +8,8 @@ dist/
 .turbo/
 coverage/
 test-results/
+.env.production
+.env.*.local
+*.production.env
+.next-dev.log
+playwright-report/

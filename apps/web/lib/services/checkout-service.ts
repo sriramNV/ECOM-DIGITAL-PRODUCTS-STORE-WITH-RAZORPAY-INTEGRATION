@@ -127,16 +127,6 @@ export const checkoutService = {
     const couponCode = rzpOrder.notes?.couponCode as string | undefined;
     let discount = 0;
     let appliedCouponId: string | undefined;
-    if (couponCode) {
-      const currentCoupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
-      if (currentCoupon) {
-        const result = await couponService.validateAndApply(couponCode, subtotal, userId);
-        if (result.valid) {
-          discount = result.discount;
-          appliedCouponId = currentCoupon.id;
-        }
-      }
-    }
 
     const total = calculateTotal(subtotal, shipping, tax, discount);
 
@@ -160,6 +150,41 @@ export const checkoutService = {
     let order;
     try {
       order = await prisma.$transaction(async (tx) => {
+        if (couponCode) {
+          const currentCoupon = await tx.coupon.findUnique({ where: { code: couponCode } });
+          if (!currentCoupon || !currentCoupon.isActive) {
+            throw new Error("Coupon is no longer valid");
+          }
+          const now = new Date();
+          if (now < currentCoupon.startDate || (currentCoupon.endDate && now > currentCoupon.endDate)) {
+            throw new Error("Coupon has expired");
+          }
+          if (subtotal < Number(currentCoupon.minOrder)) {
+            throw new Error(`Minimum order of ₹${currentCoupon.minOrder} required`);
+          }
+          const usageCount = await tx.order.count({ where: { couponId: currentCoupon.id } });
+          if (currentCoupon.usageLimit && usageCount >= currentCoupon.usageLimit) {
+            throw new Error("Coupon usage limit reached");
+          }
+          if (currentCoupon.perUserLimit) {
+            const userUsageCount = await tx.order.count({ where: { couponId: currentCoupon.id, userId } });
+            if (userUsageCount >= currentCoupon.perUserLimit) {
+              throw new Error("Coupon per-user limit reached");
+            }
+          }
+          let calculatedDiscount = 0;
+          if (currentCoupon.type === "percentage") {
+            calculatedDiscount = Math.round((subtotal * Number(currentCoupon.value)) / 100);
+            if (currentCoupon.maxDiscount) {
+              calculatedDiscount = Math.min(calculatedDiscount, Number(currentCoupon.maxDiscount));
+            }
+          } else if (currentCoupon.type === "fixed") {
+            calculatedDiscount = Number(currentCoupon.value);
+          }
+          discount = calculatedDiscount;
+          appliedCouponId = currentCoupon.id;
+        }
+
         const created = await tx.order.create({
           data: {
             orderNumber,
@@ -217,6 +242,7 @@ export const checkoutService = {
       if (err instanceof Error && err.message.startsWith("Insufficient stock")) {
         throw err;
       }
+      logger.error({ err, userId }, "Order creation transaction failed");
       throw new Error("Failed to create order - please try again");
     }
 
@@ -229,7 +255,11 @@ export const checkoutService = {
 
     fulfillmentService.submitOrder(order.id).catch((err: unknown) => logger.error({ err }, "Failed to submit order to fulfillment"));
 
-    await cartRepo.clearCart(userId);
+    try {
+      await cartRepo.clearCart(userId);
+    } catch (err) {
+      logger.error({ err, userId }, "Failed to clear cart after order - cart may need manual cleanup");
+    }
 
     return { id: order.id, orderNumber };
   },
