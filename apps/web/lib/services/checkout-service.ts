@@ -17,17 +17,13 @@ export const checkoutService = {
       throw new Error("Cart is empty");
     }
 
+    let sanitizedAddress: Record<string, unknown> | undefined;
     if (shippingAddress) {
       const parsed = shippingAddressSchema.safeParse(shippingAddress);
       if (!parsed.success) {
         throw new Error("Invalid shipping address");
       }
-    }
-
-    for (const item of cart.items) {
-      if (item.variant.stock != null && item.variant.stock < item.quantity) {
-        throw new Error(`Insufficient stock for ${item.product?.title ?? "item"}`);
-      }
+      sanitizedAddress = parsed.data;
     }
 
     const items = cart.items.map((i) => ({
@@ -42,7 +38,10 @@ export const checkoutService = {
     let discount = 0;
     let appliedCouponId: string | undefined;
     if (couponCode) {
-      const result = await couponService.validateAndApply(couponCode, subtotal, userId);
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.$queryRawUnsafe(`SELECT id FROM "Coupon" WHERE code = $1 FOR UPDATE`, couponCode);
+        return couponService.validateAndApply(couponCode, subtotal, userId);
+      });
       if (result.valid) {
         discount = result.discount;
         const coupon = await prisma.coupon.findUnique({ where: { code: result.code } });
@@ -53,7 +52,41 @@ export const checkoutService = {
     const total = calculateTotal(subtotal, shipping, tax, discount);
     const amountInPaise = Math.round(total * 100);
 
+    const orderNumber = await generateOrderNumber();
+
+    const order = await prisma.order.create({
+      data: {
+        orderNumber,
+        userId,
+        status: "PENDING_PAYMENT",
+        totalAmount: total,
+        subtotalAmount: subtotal,
+        shippingAmount: shipping,
+        taxAmount: tax,
+        taxRate: 18,
+        discountAmount: discount,
+        couponId: appliedCouponId,
+        currency: "INR",
+        shippingAddress: sanitizedAddress as any,
+        items: {
+          create: cart.items.map((ci) => ({
+            productId: ci.productId,
+            variantId: ci.variantId,
+            title: ci.product.title,
+            variant: ci.variant.title,
+            quantity: ci.quantity,
+            unitPrice: Number(ci.variant.price),
+            totalPrice: Number(ci.variant.price) * ci.quantity,
+          })),
+        },
+        statusHistory: {
+          create: { status: "PENDING_PAYMENT" },
+        },
+      },
+    });
+
     const notes: Record<string, string> = {
+      orderId: order.id,
       userId,
       expectedAmount: String(total),
       subtotal: String(subtotal),
@@ -67,11 +100,21 @@ export const checkoutService = {
     const rzpOrder = await razorpay.orders.create({
       amount: amountInPaise,
       currency: "INR",
-      receipt: `cart_${cart.id}`,
+      receipt: `order_${order.id}`,
       notes,
     });
 
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        razorpayOrderId: rzpOrder.id,
+        amount: total,
+        status: "PENDING",
+      },
+    });
+
     return {
+      orderId: order.id,
       razorpayOrderId: rzpOrder.id,
       amount: total,
       amountInPaise,
@@ -81,10 +124,10 @@ export const checkoutService = {
     };
   },
 
-  async verifyPayment(userId: string, paymentId: string, orderId: string, signature: string, shippingAddress: Record<string, unknown>) {
+  async verifyPayment(userId: string, paymentId: string, razorpayOrderId: string, signature: string, shippingAddress: Record<string, unknown>) {
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-      .update(`${orderId}|${paymentId}`)
+      .update(`${razorpayOrderId}|${paymentId}`)
       .digest("hex");
 
     const sigBuf = Buffer.from(signature, "hex");
@@ -94,137 +137,91 @@ export const checkoutService = {
       throw new Error("Invalid payment signature");
     }
 
-    const rzpOrder = await razorpay.orders.fetch(orderId);
     const payment = await razorpay.payments.fetch(paymentId);
     if (payment.status !== "captured") {
       throw new Error("Payment not yet captured - try again");
     }
 
-    const cart = await cartRepo.getByUserId(userId);
-    if (!cart || cart.items.length === 0) {
-      throw new Error("Cart is empty");
-    }
-
-    const items = cart.items.map((i) => ({
-      unitPrice: Number(i.variant.price),
-      quantity: i.quantity,
-    }));
-
-    const subtotal = calculateSubtotal(items);
-    const shipping = calculateShipping(subtotal);
-    const tax = calculateTax(subtotal);
-
-    const discount = rzpOrder.notes?.discount ? Number(rzpOrder.notes.discount) : 0;
-    const couponCode = rzpOrder.notes?.couponCode as string | undefined;
-    const appliedCouponId = rzpOrder.notes?.appliedCouponId as string | undefined;
-
-    const expectedAmount = rzpOrder.notes?.expectedAmount;
-
-    // Use validated shipping address data instead of raw input
-    const sanitizedAddress: Record<string, unknown> = {};
-    if (shippingAddress) {
-      const parsed = shippingAddressSchema.safeParse(shippingAddress);
-      if (!parsed.success) {
-        throw new Error("Invalid shipping address");
-      }
-      Object.assign(sanitizedAddress, parsed.data);
-    }
-
-    const orderNumber = await generateOrderNumber();
-
-    let order;
+    let updatedOrder;
     try {
-      order = await prisma.$transaction(async (tx) => {
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        const pendingPayment = await tx.payment.findFirst({
+          where: { razorpayOrderId, status: "PENDING" },
+          include: { order: { include: { items: true } } },
+        });
 
-        const totalWithDiscount = calculateTotal(subtotal, shipping, tax, discount);
-
-        if (expectedAmount !== undefined && Number(expectedAmount) !== totalWithDiscount) {
-          throw new Error("Payment amount mismatch - possible tampering detected");
+        if (!pendingPayment) {
+          const completedPayment = await tx.payment.findFirst({
+            where: { razorpayPaymentId: paymentId },
+            include: { order: true },
+          });
+          if (completedPayment && completedPayment.status === "COMPLETED") {
+            return completedPayment.order;
+          }
+          throw new Error("Order not found");
         }
 
-        if (payment.amount !== Math.round(totalWithDiscount * 100)) {
+        const dbOrder = pendingPayment.order;
+        if (dbOrder.status !== "PENDING_PAYMENT") {
+          if (dbOrder.status === "PAID") return dbOrder;
+          throw new Error(`Order cannot be paid (status: ${dbOrder.status})`);
+        }
+
+        const expectedAmount = pendingPayment.amount;
+        if (payment.amount !== Math.round(Number(expectedAmount) * 100)) {
           throw new Error("Payment amount mismatch - captured amount differs from expected");
         }
 
-        const dupPayment = await tx.payment.findFirst({
-          where: { razorpayPaymentId: paymentId }
-        });
-        if (dupPayment) {
-          throw new Error("Payment already processed");
-        }
-
-        const created = await tx.order.create({
+        await tx.payment.update({
+          where: { id: pendingPayment.id },
           data: {
-            orderNumber,
-            userId,
-            status: "PAID",
-            totalAmount: totalWithDiscount,
-            subtotalAmount: subtotal,
-            shippingAmount: shipping,
-            taxAmount: tax,
-            taxRate: 18,
-            discountAmount: discount,
-            couponId: appliedCouponId,
-            currency: "INR",
-            shippingAddress: sanitizedAddress as any,
-            payments: {
-              create: {
-                razorpayPaymentId: paymentId,
-                razorpayOrderId: orderId,
-                razorpaySignature: signature,
-                amount: totalWithDiscount,
-                status: "COMPLETED",
-              },
-            },
-            items: {
-              create: cart.items.map((ci) => ({
-                productId: ci.productId,
-                variantId: ci.variantId,
-                title: ci.product.title,
-                variant: ci.variant.title,
-                quantity: ci.quantity,
-                unitPrice: Number(ci.variant.price),
-                totalPrice: Number(ci.variant.price) * ci.quantity,
-              })),
-            },
-            statusHistory: {
-              create: { status: "PAID" },
-            },
+            razorpayPaymentId: paymentId,
+            razorpaySignature: signature,
+            status: "COMPLETED",
           },
+        });
+
+        const updated = await tx.order.update({
+          where: { id: dbOrder.id },
+          data: { status: "PAID" },
           include: { items: true },
         });
 
-        for (const item of cart.items) {
+        await tx.orderStatusHistory.create({
+          data: { orderId: dbOrder.id, status: "PAID", note: "Payment verified successfully" },
+        });
+
+        for (const item of dbOrder.items) {
           const result = await tx.productVariant.updateMany({
             where: { id: item.variantId, stock: { gte: item.quantity } },
             data: { stock: { decrement: item.quantity } },
           });
           if (result.count === 0) {
-            throw new Error(`Insufficient stock for ${item.product?.title ?? "item"}`);
+            throw new Error(`Insufficient stock for ${item.title ?? "item"}`);
           }
         }
 
-        return created;
+        return updated;
       });
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.startsWith("Insufficient stock")) {
+      if (err instanceof Error && (err.message.startsWith("Insufficient stock") || err.message.startsWith("Order not found") || err.message.startsWith("Order cannot"))) {
         throw err;
       }
-      logger.error({ err, userId }, "Order creation transaction failed");
-      throw new Error("Failed to create order - please try again");
+      logger.error({ err, userId }, "Payment verification transaction failed");
+      throw new Error("Failed to verify payment - please try again");
     }
 
-    logger.info({ orderId: order.id, orderNumber }, "Order created after payment");
+    logger.info({ orderId: updatedOrder.id, orderNumber: updatedOrder.orderNumber }, "Order paid successfully");
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
     if (user) {
-      emailService.sendOrderConfirmation(order as any, user as any).catch((err: unknown) => logger.error({ err }, "Failed to send order confirmation"));
+      emailService.sendOrderConfirmation(updatedOrder as any, user as any).catch((err: unknown) => logger.error({ err }, "Failed to send order confirmation"));
     }
 
-    fulfillmentService.submitOrder(order.id)
+    fulfillmentService.submitOrder(updatedOrder.id)
       .then(() => cartRepo.clearCart(userId).catch((err: unknown) => logger.error({ err, userId }, "Failed to clear cart after order - cart may need manual cleanup")))
       .catch((err: unknown) => logger.error({ err }, "Failed to submit order to fulfillment"));
 
-    return { id: order.id, orderNumber };
+    return { id: updatedOrder.id, orderNumber: updatedOrder.orderNumber };
   },
 };
