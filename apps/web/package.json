@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "prisma:seed": "npx tsx ../../prisma/seed.ts"
+    "prisma:seed": "npx tsx ../../prisma/seed.ts",
+    "start:worker": "tsx lib/jobs/worker.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
