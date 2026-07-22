@@ -1,15 +1,21 @@
 import { ensureAbandonedCartWorker } from "./abandoned-cart";
 import { logger } from "@/lib/logger";
 
-ensureAbandonedCartWorker();
-logger.info("Worker process ready — abandoned cart processor registered");
+let workerQueue: ReturnType<typeof ensureAbandonedCartWorker>;
 
-process.on("SIGTERM", () => {
-  logger.info("Worker received SIGTERM, shutting down");
-  process.exit(0);
-});
+try {
+  workerQueue = ensureAbandonedCartWorker();
+  logger.info("Worker process ready — abandoned cart processor registered");
+} catch (error) {
+  logger.error({ error }, "Failed to initialize abandoned cart worker");
+  process.exit(1);
+}
 
-process.on("SIGINT", () => {
-  logger.info("Worker received SIGINT, shutting down");
+async function shutdown(signal: string) {
+  logger.info({ signal }, "Worker shutting down");
+  await workerQueue.close();
   process.exit(0);
-});
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
