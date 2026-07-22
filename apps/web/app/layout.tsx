@@ -6,6 +6,8 @@ import { SessionProvider } from "@/providers/session-provider";
 import { PostHogProvider } from "@/providers/posthog-provider";
 import { QueryProvider } from "@/providers/query-provider";
 
+export const dynamic = "force-dynamic";
+
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {

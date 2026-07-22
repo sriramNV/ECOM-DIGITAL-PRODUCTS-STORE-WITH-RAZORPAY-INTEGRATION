@@ -28,4 +28,6 @@ export function ensureAbandonedCartWorker() {
   });
 
   logger.info("Abandoned cart worker started");
+
+  return abandonedCartQueue;
 }
