@@ -5,7 +5,7 @@
 .env
 .env.local
 .env.production
-Dockerfile
+/Dockerfile
 docker-compose*.yml
 .gitignore
 .pnp
