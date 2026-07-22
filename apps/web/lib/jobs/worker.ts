@@ -1,7 +1,7 @@
 import { ensureAbandonedCartWorker } from "./abandoned-cart";
 import { logger } from "@/lib/logger";
 
-let workerQueue: ReturnType<typeof ensureAbandonedCartWorker>;
+let workerQueue: ReturnType<typeof ensureAbandonedCartWorker> | undefined;
 
 try {
   workerQueue = ensureAbandonedCartWorker();
@@ -13,7 +13,7 @@ try {
 
 async function shutdown(signal: string) {
   logger.info({ signal }, "Worker shutting down");
-  await workerQueue.close();
+  if (workerQueue) await workerQueue.close();
   process.exit(0);
 }
 

@@ -17,12 +17,11 @@ COPY apps/web/lib/ ./apps/web/lib/
 COPY apps/web/tsconfig.json ./apps/web/tsconfig.json
 
 # Bundle worker with esbuild — resolves @/ aliases at build time
-RUN npm install -g esbuild && \
-  esbuild apps/web/lib/jobs/worker.ts \
+RUN npm install -g esbuild && esbuild apps/web/lib/jobs/worker.ts \
   --bundle \
   --platform=node \
   --target=node22 \
-  --alias:@=./apps/web/ \
+  --alias:@=./apps/web \
   --outfile=dist/worker.js \
   --packages=external
 
