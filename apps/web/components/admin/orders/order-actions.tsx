@@ -27,7 +27,7 @@ export function OrderActions({ orderId, status }: Props) {
         throw new Error(data.error ?? "Failed to update order");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update order");
+      toast.error("Failed to update order");
     }
     setLoading(null);
     router.refresh();

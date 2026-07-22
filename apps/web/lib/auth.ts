@@ -60,6 +60,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
   cookies: {
-    sessionToken: { name: "next-auth.session-token", options: { sameSite: "strict" } },
+    sessionToken: { name: "next-auth.session-token", options: { sameSite: "strict", secure: process.env.NODE_ENV === "production" } },
   },
 });

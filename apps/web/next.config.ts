@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "picsum.photos" },

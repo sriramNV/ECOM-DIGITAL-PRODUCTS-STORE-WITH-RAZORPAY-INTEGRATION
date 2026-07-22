@@ -136,7 +136,15 @@ export const fulfillmentService = {
       if (orderEntity) {
         const user = await prisma.user.findUnique({ where: { id: orderEntity.userId }, select: { email: true } });
         if (newStatus === "SHIPPED" && user && event.data?.shipping) {
-          emailService.sendShipmentNotification(orderEntity as any, { carrier: event.data.shipping.carrier, trackingNumber: event.data.shipping.tracking_number, trackingUrl: event.data.shipping.tracking_url }, user.email).catch(logger.error);
+          const trackingUrl = event.data.shipping.tracking_url?.startsWith("https://")
+            ? event.data.shipping.tracking_url
+            : (() => {
+                if (event.data.shipping.tracking_url) {
+                  logger.warn({ orderId, trackingUrl: event.data.shipping.tracking_url }, "Invalid tracking URL from Printify, storing null");
+                }
+                return null;
+              })();
+          emailService.sendShipmentNotification(orderEntity as any, { carrier: event.data.shipping.carrier, trackingNumber: event.data.shipping.tracking_number, trackingUrl }, user.email).catch(logger.error);
         }
         if (newStatus === "DELIVERED" && user) {
           emailService.sendDeliveryConfirmation(orderEntity as any, user.email).catch(logger.error);

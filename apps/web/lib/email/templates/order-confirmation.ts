@@ -1,3 +1,5 @@
+import { h } from "./html-escape";
+
 export function renderOrderConfirmation(order: {
   orderNumber: string;
   totalAmount: number;
@@ -8,8 +10,8 @@ export function renderOrderConfirmation(order: {
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"></head>
     <body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h1 style="color: #1a1a2e;">Thank you, ${userName}!</h1>
-      <p>Your order <strong>${order.orderNumber}</strong> has been confirmed.</p>
+      <h1 style="color: #1a1a2e;">Thank you, ${h(userName)}!</h1>
+      <p>Your order <strong>${h(order.orderNumber)}</strong> has been confirmed.</p>
       <table style="width:100%;border-collapse:collapse;margin:20px 0;">
         <tr style="background:#f8f9fa;">
           <th style="padding:10px;text-align:left;">Item</th>
@@ -18,7 +20,7 @@ export function renderOrderConfirmation(order: {
         </tr>
         ${order.items.map((item) => `
           <tr>
-            <td style="padding:10px;border-top:1px solid #eee;">${item.title}</td>
+            <td style="padding:10px;border-top:1px solid #eee;">${h(item.title)}</td>
             <td style="padding:10px;border-top:1px solid #eee;text-align:center;">${item.quantity}</td>
             <td style="padding:10px;border-top:1px solid #eee;text-align:right;">₹${item.totalPrice}</td>
           </tr>

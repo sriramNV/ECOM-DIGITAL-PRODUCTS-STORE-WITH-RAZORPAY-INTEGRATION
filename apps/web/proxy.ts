@@ -3,6 +3,25 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { redis } from "@/lib/redis";
 
+const localRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of localRateLimitMap) {
+    if (now > entry.resetAt) localRateLimitMap.delete(ip);
+  }
+}, 60_000).unref();
+
+function localRateLimit(ip: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = localRateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    localRateLimitMap.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= maxRequests;
+}
+
 async function rateLimit(ip: string, maxRequests: number, windowMs: number): Promise<boolean> {
   try {
     const key = `ratelimit:${ip}`;
@@ -10,8 +29,8 @@ async function rateLimit(ip: string, maxRequests: number, windowMs: number): Pro
     if (current === 1) await redis.expire(key, Math.floor(windowMs / 1000));
     return current <= maxRequests;
   } catch {
-    logger.warn({ maxRequests, windowMs }, "Rate limiting unavailable - blocking request");
-    return false;
+    logger.warn({ maxRequests, windowMs }, "Rate limiting unavailable - using local fallback");
+    return localRateLimit(ip, maxRequests, windowMs);
   }
 }
 
@@ -20,13 +39,23 @@ export default auth(async (req) => {
   const isLoggedIn = !!req.auth;
   const isAdmin = req.auth?.user?.role === "ADMIN";
 
-  if (pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/api/") || pathname === "/login" || pathname === "/register") {
     const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
-    const ip = forwardedFor.split(",").shift()?.trim() || req.headers.get("x-real-ip") || "unknown";
-    const maxRequests = pathname.startsWith("/api/auth/") ? 10 : 100;
+    const remoteIp = (req as any).ip || req.headers.get("x-real-ip") || "unknown";
+    const ip = forwardedFor.split(",").shift()?.trim() || remoteIp;
+    const maxRequests =
+      pathname === "/api/auth/register" ? 5 :
+      pathname === "/api/promotions/coupons/validate" ? 10 :
+      pathname === "/api/contact" ? 5 :
+      pathname === "/api/newsletter/subscribe" ? 5 :
+      pathname.startsWith("/api/auth/") ? 10 :
+      pathname === "/login" || pathname === "/register" ? 10 : 100;
     const allowed = await rateLimit(ip, maxRequests, 60000);
     if (!allowed) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+      const isApi = pathname.startsWith("/api/");
+      return isApi
+        ? NextResponse.json({ error: "Too many requests" }, { status: 429 })
+        : NextResponse.redirect(new URL(`/login?error=RateLimited`, req.url));
     }
   }
 

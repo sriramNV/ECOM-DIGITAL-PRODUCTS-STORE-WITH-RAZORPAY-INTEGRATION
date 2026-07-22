@@ -10,10 +10,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ valid: false, error: "Invalid request" }, { status: 400 });
     }
 
+    const sanitizedCode = code.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const session = await auth();
     const userId = session?.user?.id ?? "guest";
     const result = await couponService.validateAndApply(code, subtotal, userId);
-    return NextResponse.json({ valid: result.valid, discount: result.discount, code: result.code, error: result.error ?? null });
+    return NextResponse.json({ valid: result.valid, discount: result.discount, code: sanitizedCode, error: result.error ?? null });
   } catch (error) {
     return handleApiError(error, "promotions/coupons/validate POST");
   }

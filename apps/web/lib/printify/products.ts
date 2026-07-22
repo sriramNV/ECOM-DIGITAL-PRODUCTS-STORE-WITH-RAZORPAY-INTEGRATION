@@ -1,14 +1,17 @@
 import { printifyClient } from "./client";
 import type { PrintifyProduct } from "./types";
 
-const SHOP_ID = process.env.PRINTIFY_SHOP_ID;
-if (!SHOP_ID) throw new Error("PRINTIFY_SHOP_ID environment variable is not configured");
+function getShopId(): string {
+  const id = process.env.PRINTIFY_SHOP_ID;
+  if (!id) throw new Error("PRINTIFY_SHOP_ID environment variable is not configured");
+  return id;
+}
 
 export const printifyProducts = {
   async list() {
     return printifyClient.request<{ data: PrintifyProduct[] }>({
       method: "GET",
-      path: `/shops/${SHOP_ID}/products.json`,
+      path: `/shops/${getShopId()}/products.json`,
     });
   },
 
@@ -22,7 +25,7 @@ export const printifyProducts = {
   }) {
     return printifyClient.request<PrintifyProduct>({
       method: "POST",
-      path: `/shops/${SHOP_ID}/products.json`,
+      path: `/shops/${getShopId()}/products.json`,
       body: data,
     });
   },
@@ -30,7 +33,7 @@ export const printifyProducts = {
   async update(productId: string, data: Partial<{ title: string; description: string; variants: Array<{ id: number; price: number }> }>) {
     return printifyClient.request<PrintifyProduct>({
       method: "PUT",
-      path: `/shops/${SHOP_ID}/products/${productId}.json`,
+      path: `/shops/${getShopId()}/products/${productId}.json`,
       body: data,
     });
   },
@@ -38,14 +41,14 @@ export const printifyProducts = {
   async publish(productId: string) {
     return printifyClient.request({
       method: "POST",
-      path: `/shops/${SHOP_ID}/products/${productId}/publish.json`,
+      path: `/shops/${getShopId()}/products/${productId}/publish.json`,
     });
   },
 
   async delete(productId: string) {
     return printifyClient.request({
       method: "DELETE",
-      path: `/shops/${SHOP_ID}/products/${productId}.json`,
+      path: `/shops/${getShopId()}/products/${productId}.json`,
     });
   },
 };

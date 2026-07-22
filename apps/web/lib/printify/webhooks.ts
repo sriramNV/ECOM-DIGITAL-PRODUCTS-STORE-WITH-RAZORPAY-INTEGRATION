@@ -1,21 +1,24 @@
 import { printifyClient } from "./client";
 import type { PrintifyShop } from "./types";
 
-const SHOP_ID = process.env.PRINTIFY_SHOP_ID;
-if (!SHOP_ID) throw new Error("PRINTIFY_SHOP_ID environment variable is not configured");
+function getShopId(): string {
+  const id = process.env.PRINTIFY_SHOP_ID;
+  if (!id) throw new Error("PRINTIFY_SHOP_ID environment variable is not configured");
+  return id;
+}
 
 export const printifyWebhooks = {
   async list() {
     return printifyClient.request<Array<{ id: string; topic: string; url: string }>>({
       method: "GET",
-      path: `/shops/${SHOP_ID}/webhooks.json`,
+      path: `/shops/${getShopId()}/webhooks.json`,
     });
   },
 
   async create(topic: string, url: string) {
     return printifyClient.request<{ id: string }>({
       method: "POST",
-      path: `/shops/${SHOP_ID}/webhooks.json`,
+      path: `/shops/${getShopId()}/webhooks.json`,
       body: { topic, url },
     });
   },
@@ -23,7 +26,7 @@ export const printifyWebhooks = {
   async remove(webhookId: string) {
     return printifyClient.request({
       method: "DELETE",
-      path: `/shops/${SHOP_ID}/webhooks/${webhookId}.json`,
+      path: `/shops/${getShopId()}/webhooks/${webhookId}.json`,
     });
   },
 };

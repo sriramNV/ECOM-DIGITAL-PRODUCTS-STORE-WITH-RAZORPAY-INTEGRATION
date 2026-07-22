@@ -12,7 +12,12 @@ const registerSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     const data = registerSchema.parse(body);
 
     const existing = await prisma.user.findUnique({ where: { email: data.email } });

@@ -105,16 +105,6 @@ export const checkoutService = {
       throw new Error("Cart is empty");
     }
 
-    const existingPayment = await prisma.payment.findFirst({
-      where: { razorpayPaymentId: paymentId }
-    });
-    if (existingPayment) {
-      const order = await prisma.order.findUnique({
-        where: { id: existingPayment.orderId }
-      });
-      if (order) return { id: order.id, orderNumber: order.orderNumber };
-    }
-
     const items = cart.items.map((i) => ({
       unitPrice: Number(i.variant.price),
       quantity: i.quantity,
@@ -124,9 +114,9 @@ export const checkoutService = {
     const shipping = calculateShipping(subtotal);
     const tax = calculateTax(subtotal);
 
+    const discount = rzpOrder.notes?.discount ? Number(rzpOrder.notes.discount) : 0;
     const couponCode = rzpOrder.notes?.couponCode as string | undefined;
-    let discount = 0;
-    let appliedCouponId: string | undefined;
+    const appliedCouponId = rzpOrder.notes?.appliedCouponId as string | undefined;
 
     const expectedAmount = rzpOrder.notes?.expectedAmount;
 
@@ -145,40 +135,6 @@ export const checkoutService = {
     let order;
     try {
       order = await prisma.$transaction(async (tx) => {
-        if (couponCode) {
-          const currentCoupon = await tx.coupon.findUnique({ where: { code: couponCode } });
-          if (!currentCoupon || !currentCoupon.isActive) {
-            throw new Error("Coupon is no longer valid");
-          }
-          const now = new Date();
-          if (now < currentCoupon.startDate || (currentCoupon.endDate && now > currentCoupon.endDate)) {
-            throw new Error("Coupon has expired");
-          }
-          if (subtotal < Number(currentCoupon.minOrder)) {
-            throw new Error(`Minimum order of ₹${currentCoupon.minOrder} required`);
-          }
-          const usageCount = await tx.order.count({ where: { couponId: currentCoupon.id } });
-          if (currentCoupon.usageLimit && usageCount >= currentCoupon.usageLimit) {
-            throw new Error("Coupon usage limit reached");
-          }
-          if (currentCoupon.perUserLimit) {
-            const userUsageCount = await tx.order.count({ where: { couponId: currentCoupon.id, userId } });
-            if (userUsageCount >= currentCoupon.perUserLimit) {
-              throw new Error("Coupon per-user limit reached");
-            }
-          }
-          let calculatedDiscount = 0;
-          if (currentCoupon.type === "percentage") {
-            calculatedDiscount = Math.round((subtotal * Number(currentCoupon.value)) / 100);
-            if (currentCoupon.maxDiscount) {
-              calculatedDiscount = Math.min(calculatedDiscount, Number(currentCoupon.maxDiscount));
-            }
-          } else if (currentCoupon.type === "fixed") {
-            calculatedDiscount = Number(currentCoupon.value);
-          }
-          discount = calculatedDiscount;
-          appliedCouponId = currentCoupon.id;
-        }
 
         const totalWithDiscount = calculateTotal(subtotal, shipping, tax, discount);
 
@@ -188,6 +144,13 @@ export const checkoutService = {
 
         if (payment.amount !== Math.round(totalWithDiscount * 100)) {
           throw new Error("Payment amount mismatch - captured amount differs from expected");
+        }
+
+        const dupPayment = await tx.payment.findFirst({
+          where: { razorpayPaymentId: paymentId }
+        });
+        if (dupPayment) {
+          throw new Error("Payment already processed");
         }
 
         const created = await tx.order.create({
@@ -258,13 +221,9 @@ export const checkoutService = {
       emailService.sendOrderConfirmation(order as any, user as any).catch((err: unknown) => logger.error({ err }, "Failed to send order confirmation"));
     }
 
-    fulfillmentService.submitOrder(order.id).catch((err: unknown) => logger.error({ err }, "Failed to submit order to fulfillment"));
-
-    try {
-      await cartRepo.clearCart(userId);
-    } catch (err) {
-      logger.error({ err, userId }, "Failed to clear cart after order - cart may need manual cleanup");
-    }
+    fulfillmentService.submitOrder(order.id)
+      .then(() => cartRepo.clearCart(userId).catch((err: unknown) => logger.error({ err, userId }, "Failed to clear cart after order - cart may need manual cleanup")))
+      .catch((err: unknown) => logger.error({ err }, "Failed to submit order to fulfillment"));
 
     return { id: order.id, orderNumber };
   },

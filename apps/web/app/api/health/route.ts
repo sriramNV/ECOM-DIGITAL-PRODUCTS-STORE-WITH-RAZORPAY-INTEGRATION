@@ -3,10 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
 
+const HEALTH_CHECK_TOKEN = process.env.HEALTH_CHECK_TOKEN;
+
+if (!HEALTH_CHECK_TOKEN) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("HEALTH_CHECK_TOKEN environment variable is required");
+  }
+  logger.warn("HEALTH_CHECK_TOKEN not set - health endpoint is unsecured");
+}
+
 export async function GET(request: NextRequest) {
   const healthToken = request.headers.get("x-health-token") ?? request.nextUrl.searchParams.get("token");
-  const expectedToken = process.env.HEALTH_CHECK_TOKEN;
-  if (expectedToken && healthToken !== expectedToken) {
+  if (HEALTH_CHECK_TOKEN && healthToken !== HEALTH_CHECK_TOKEN) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -15,7 +15,10 @@ export function CheckoutForm() {
       try {
         const guestItems = JSON.parse(stored);
         if (Array.isArray(guestItems) && guestItems.length > 0) {
-          setItems(guestItems);
+          const validated = guestItems.filter((item: unknown) =>
+            item && typeof item === "object" && "id" in item && "price" in item
+          );
+          setItems(validated);
         }
       } catch { /* ignore */ }
     }

@@ -31,7 +31,7 @@ export const emailService = {
     await sendEmail(user.email, `Order Confirmed — ${order.orderNumber}`, html, "order.confirmation", order.id);
   },
 
-  async sendShipmentNotification(order: Order, tracking: { carrier: string; trackingNumber: string; trackingUrl: string }, userEmail: string) {
+  async sendShipmentNotification(order: Order, tracking: { carrier: string; trackingNumber: string; trackingUrl: string | null }, userEmail: string) {
     const html = renderOrderShipped({ orderNumber: order.orderNumber, tracking });
     await sendEmail(userEmail, `Your Order Has Shipped — ${order.orderNumber}`, html, "order.shipped", order.id);
   },

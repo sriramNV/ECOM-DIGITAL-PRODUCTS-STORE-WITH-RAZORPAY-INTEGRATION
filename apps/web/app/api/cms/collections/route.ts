@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cmsRepo } from "@/lib/repositories/cms-repo";
 import { logger } from "@/lib/logger";
+import { adminGuard } from "@/lib/admin-guard";
 
 export async function GET(request: NextRequest) {
+  const guard = await adminGuard();
+  if (guard) return guard;
+
   try {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get("slug") ?? undefined;
