@@ -224,7 +224,7 @@ model Payment {
   id                String        @id @default(cuid())
   orderId           String
   razorpayPaymentId String?       @unique
-  razorpayOrderId   String?
+  razorpayOrderId   String?   @unique
   razorpaySignature String?
   amount            Decimal
   currency          String        @default("INR")

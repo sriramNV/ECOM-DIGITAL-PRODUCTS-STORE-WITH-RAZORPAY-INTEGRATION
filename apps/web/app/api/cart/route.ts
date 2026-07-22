@@ -41,7 +41,12 @@ export async function POST(request: NextRequest) {
         const variant = await tx.productVariant.findFirst({
           where: { id: item.variantId, product: { isActive: true, id: item.productId } },
         });
-        if (!variant) throw new Error(`Product variant ${item.variantId} not found or inactive`);
+        if (!variant) {
+          throw new Error(`Product variant ${item.variantId} not found or inactive`);
+        }
+        if (variant.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${variant.title}`);
+        }
         await tx.cartItem.create({
           data: { cartId: cart.id, productId: item.productId, variantId: item.variantId, quantity: Math.min(item.quantity, 10) },
         });
@@ -50,6 +55,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof Error && (error.message.startsWith("Product variant") || error.message.startsWith("Insufficient stock"))) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return handleApiError(error, "cart POST");
   }
 }

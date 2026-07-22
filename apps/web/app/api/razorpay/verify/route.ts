@@ -8,7 +8,6 @@ const verifySchema = z.object({
   razorpay_payment_id: z.string(),
   razorpay_order_id: z.string(),
   razorpay_signature: z.string(),
-  shippingAddress: z.record(z.unknown()),
 });
 
 export async function POST(request: NextRequest) {
@@ -26,7 +25,6 @@ export async function POST(request: NextRequest) {
       data.razorpay_payment_id,
       data.razorpay_order_id,
       data.razorpay_signature,
-      data.shippingAddress,
     );
 
     return NextResponse.json(order);

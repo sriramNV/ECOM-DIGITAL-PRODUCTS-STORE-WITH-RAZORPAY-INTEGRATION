@@ -3,11 +3,17 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { redis } from "@/lib/redis";
 
+const MAX_LOCAL_ENTRIES = 10_000;
 const localRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 setInterval(() => {
   const now = Date.now();
   for (const [ip, entry] of localRateLimitMap) {
     if (now > entry.resetAt) localRateLimitMap.delete(ip);
+  }
+  if (localRateLimitMap.size > MAX_LOCAL_ENTRIES) {
+    const toDelete = localRateLimitMap.size - MAX_LOCAL_ENTRIES;
+    const keys = [...localRateLimitMap.keys()].slice(0, toDelete);
+    for (const key of keys) localRateLimitMap.delete(key);
   }
 }, 60_000).unref();
 
@@ -25,9 +31,15 @@ function localRateLimit(ip: string, maxRequests: number, windowMs: number): bool
 async function rateLimit(ip: string, maxRequests: number, windowMs: number): Promise<boolean> {
   try {
     const key = `ratelimit:${ip}`;
-    const current = await redis.incr(key);
-    if (current === 1) await redis.expire(key, Math.floor(windowMs / 1000));
-    return current <= maxRequests;
+    const script = `
+      local current = redis.call("INCR", KEYS[1])
+      if current == 1 then
+        redis.call("EXPIRE", KEYS[1], ARGV[1])
+      end
+      return current
+    `;
+    const current = await redis.eval(script, 1, key, Math.floor(windowMs / 1000));
+    return Number(current) <= maxRequests;
   } catch {
     logger.warn({ maxRequests, windowMs }, "Rate limiting unavailable - using local fallback");
     return localRateLimit(ip, maxRequests, windowMs);
@@ -41,15 +53,15 @@ export default auth(async (req) => {
 
   if (pathname.startsWith("/api/") || pathname === "/login" || pathname === "/register") {
     const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
-    const remoteIp = (req as any).ip || req.headers.get("x-real-ip") || "unknown";
+    const remoteIp = req.headers.get("x-real-ip") ?? "unknown";
     const ip = forwardedFor.split(",").shift()?.trim() || remoteIp;
     const maxRequests =
       pathname === "/api/auth/register" ? 5 :
       pathname === "/api/promotions/coupons/validate" ? 10 :
       pathname === "/api/contact" ? 5 :
       pathname === "/api/newsletter/subscribe" ? 5 :
-      pathname.startsWith("/api/auth/") ? 10 :
-      pathname === "/login" || pathname === "/register" ? 10 : 100;
+      pathname.startsWith("/api/auth/") ? 5 :
+      pathname === "/login" || pathname === "/register" ? 5 : 100;
     const allowed = await rateLimit(ip, maxRequests, 60000);
     if (!allowed) {
       const isApi = pathname.startsWith("/api/");

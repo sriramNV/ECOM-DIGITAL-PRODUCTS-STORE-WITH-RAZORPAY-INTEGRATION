@@ -66,6 +66,8 @@ export async function PATCH(
         }
         await orderRepo.updateStatus(id, "DELIVERED");
         break;
+      default:
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
     const session = await auth();

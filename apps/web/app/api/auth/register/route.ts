@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 
@@ -19,11 +20,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
     const data = registerSchema.parse(body);
-
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) {
-      return NextResponse.json({ error: "Email already registered" }, { status: 409 });
-    }
 
     const hashedPassword = await hash(data.password, 12);
 
@@ -45,6 +41,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 422 });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "Email already registered" }, { status: 409 });
     }
     logger.error({ error }, "Registration failed");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { redis } from "@/lib/redis";
 import { prisma } from "@/lib/prisma";
+import { cartRepo } from "@/lib/repositories/cart-repo";
 import { logger } from "@/lib/logger";
 import { handleApiError } from "@/lib/api-error-handler";
 
@@ -29,9 +30,13 @@ export async function POST(request: NextRequest) {
     const eventId = event.event_id ?? `${event.event}:${(event.payload?.payment?.entity?.id) ?? Date.now()}`;
 
     const dedupKey = `webhook:${eventId}`;
-    const alreadyProcessed = await redis.set(dedupKey, "1", "EX", 86400, "NX");
-    if (!alreadyProcessed) {
-      return NextResponse.json({ status: "already_processed" });
+    try {
+      const alreadyProcessed = await redis.set(dedupKey, "1", "EX", 86400, "NX");
+      if (!alreadyProcessed) {
+        return NextResponse.json({ status: "already_processed" });
+      }
+    } catch {
+      logger.warn({ dedupKey }, "Redis dedup unavailable - proceeding without dedup");
     }
 
     if (event.event === "payment.captured") {
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
       if (rzpOrderId) {
         const pendingPayment = await prisma.payment.findFirst({
           where: { razorpayOrderId: rzpOrderId, status: "PENDING" },
-          include: { order: true },
+          include: { order: { include: { items: true } } },
         });
 
         if (pendingPayment && pendingPayment.order.status === "PENDING_PAYMENT") {
@@ -50,15 +55,31 @@ export async function POST(request: NextRequest) {
               where: { id: pendingPayment.id },
               data: { status: "COMPLETED", razorpayPaymentId: paymentId },
             });
-            await tx.order.update({
+            const updated = await tx.order.update({
               where: { id: pendingPayment.orderId },
               data: { status: "PAID" },
+              include: { items: true },
             });
+
+            for (const item of updated.items) {
+              const result = await tx.productVariant.updateMany({
+                where: { id: item.variantId, stock: { gte: item.quantity } },
+                data: { stock: { decrement: item.quantity } },
+              });
+              if (result.count === 0) {
+                throw new Error(`Insufficient stock for ${item.title ?? "item"}`);
+              }
+            }
+
             await tx.orderStatusHistory.create({
               data: { orderId: pendingPayment.orderId, status: "PAID", note: "Payment captured via webhook" },
             });
           });
           logger.info({ orderId: pendingPayment.orderId }, "Order paid via webhook (payment.captured)");
+
+          cartRepo.clearCart(pendingPayment.order.userId).catch((err: unknown) =>
+            logger.error({ err, orderId: pendingPayment.orderId }, "Failed to clear cart after webhook payment")
+          );
         }
       }
     }
@@ -80,7 +101,7 @@ export async function POST(request: NextRequest) {
           await prisma.$transaction(async (tx) => {
             await tx.payment.update({
               where: { id: pendingPayment.id },
-              data: { status: "FAILED" },
+              data: { status: "FAILED", razorpayPaymentId: paymentId },
             });
             await tx.order.update({
               where: { id: pendingPayment.orderId },

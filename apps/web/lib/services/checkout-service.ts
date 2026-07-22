@@ -40,12 +40,11 @@ export const checkoutService = {
     if (couponCode) {
       const result = await prisma.$transaction(async (tx) => {
         await tx.$queryRawUnsafe(`SELECT id FROM "Coupon" WHERE code = $1 FOR UPDATE`, couponCode);
-        return couponService.validateAndApply(couponCode, subtotal, userId);
+        return couponService.validateAndApplyOnTx(tx, couponCode, subtotal, userId);
       });
       if (result.valid) {
         discount = result.discount;
-        const coupon = await prisma.coupon.findUnique({ where: { code: result.code } });
-        appliedCouponId = coupon?.id;
+        appliedCouponId = result.couponId;
       }
     }
 
@@ -54,6 +53,27 @@ export const checkoutService = {
 
     const orderNumber = await generateOrderNumber();
 
+    // Create Razorpay order BEFORE any DB writes so a failure leaves no orphan
+    const notes: Record<string, string> = {
+      orderId: `pending:${orderNumber}`,
+      userId,
+      expectedAmount: String(total),
+      subtotal: String(subtotal),
+      shipping: String(shipping),
+      tax: String(tax),
+      discount: String(discount),
+    };
+    if (couponCode) notes.couponCode = couponCode;
+    if (appliedCouponId) notes.appliedCouponId = appliedCouponId;
+
+    const rzpOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `order_${orderNumber}`,
+      notes,
+    });
+
+    // Create order + payment atomically
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -82,34 +102,13 @@ export const checkoutService = {
         statusHistory: {
           create: { status: "PENDING_PAYMENT" },
         },
-      },
-    });
-
-    const notes: Record<string, string> = {
-      orderId: order.id,
-      userId,
-      expectedAmount: String(total),
-      subtotal: String(subtotal),
-      shipping: String(shipping),
-      tax: String(tax),
-      discount: String(discount),
-    };
-    if (couponCode) notes.couponCode = couponCode;
-    if (appliedCouponId) notes.appliedCouponId = appliedCouponId;
-
-    const rzpOrder = await razorpay.orders.create({
-      amount: amountInPaise,
-      currency: "INR",
-      receipt: `order_${order.id}`,
-      notes,
-    });
-
-    await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        razorpayOrderId: rzpOrder.id,
-        amount: total,
-        status: "PENDING",
+        payments: {
+          create: {
+            razorpayOrderId: rzpOrder.id,
+            amount: total,
+            status: "PENDING",
+          },
+        },
       },
     });
 
@@ -124,7 +123,7 @@ export const checkoutService = {
     };
   },
 
-  async verifyPayment(userId: string, paymentId: string, razorpayOrderId: string, signature: string, shippingAddress: Record<string, unknown>) {
+  async verifyPayment(userId: string, paymentId: string, razorpayOrderId: string, signature: string) {
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
       .update(`${razorpayOrderId}|${paymentId}`)
@@ -218,8 +217,9 @@ export const checkoutService = {
       emailService.sendOrderConfirmation(updatedOrder as any, user as any).catch((err: unknown) => logger.error({ err }, "Failed to send order confirmation"));
     }
 
+    cartRepo.clearCart(userId).catch((err: unknown) => logger.error({ err, userId }, "Failed to clear cart after order - cart may need manual cleanup"));
+
     fulfillmentService.submitOrder(updatedOrder.id)
-      .then(() => cartRepo.clearCart(userId).catch((err: unknown) => logger.error({ err, userId }, "Failed to clear cart after order - cart may need manual cleanup")))
       .catch((err: unknown) => logger.error({ err }, "Failed to submit order to fulfillment"));
 
     return { id: updatedOrder.id, orderNumber: updatedOrder.orderNumber };
