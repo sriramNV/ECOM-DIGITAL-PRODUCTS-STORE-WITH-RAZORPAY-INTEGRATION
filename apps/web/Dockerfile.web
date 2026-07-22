@@ -19,10 +19,10 @@ RUN npx prisma generate --schema=./prisma/schema.prisma
 FROM prisma AS builder
 WORKDIR /app/apps/web
 COPY apps/web/ ./
-    RUN mkdir -p .next && chown -R node:node /app/apps/web
-    USER node
-    ENV NODE_ENV=production
-    RUN pnpm exec next build
+RUN mkdir -p .next && chown -R node:node /app/apps/web
+USER node
+ENV NODE_ENV=production
+RUN pnpm exec next build
 
 # Stage 5: Runner
 FROM node:22-alpine AS runner
