@@ -54,7 +54,7 @@ pgbackup:
   image: prodrigestivill/postgres-backup-local:16-alpine
   environment:
     POSTGRES_HOST: postgres
-    POSTGRES_DB: digital-products
+    POSTGRES_DB: digital_products
     POSTGRES_USER: pod
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     SCHEDULE: "@daily"
@@ -66,13 +66,13 @@ pgbackup:
 ### Manual
 
 ```bash
-docker compose exec postgres pg_dump -U pod digital-products > backup_$(date +%Y%m%d).sql
+docker compose exec postgres pg_dump -U pod digital_products > backup_$(date +%Y%m%d).sql
 ```
 
 ### Restore
 
 ```bash
-cat backup_20260101.sql | docker compose exec -T postgres psql -U pod digital-products
+cat backup_20260101.sql | docker compose exec -T postgres psql -U pod digital_products
 ```
 
 ## File Storage Backups

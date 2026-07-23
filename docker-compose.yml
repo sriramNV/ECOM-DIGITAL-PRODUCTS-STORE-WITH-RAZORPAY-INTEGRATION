@@ -5,11 +5,11 @@ services:
     environment:
       POSTGRES_USER: pod
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must be set}
-      POSTGRES_DB: digital-products
+      POSTGRES_DB: digital_products
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pod -d digital-products"]
+      test: ["CMD-SHELL", "pg_isready -U pod -d digital_products"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -52,13 +52,13 @@ services:
     ports: ["3000:3000"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital-products
+      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital_products
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: digital-products
+      MINIO_BUCKET: digital_products
       MINIO_USE_SSL: "false"
       AUTH_SECRET: ${AUTH_SECRET:?must be set}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
