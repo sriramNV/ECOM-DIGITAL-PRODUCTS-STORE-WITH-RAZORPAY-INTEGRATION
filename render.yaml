@@ -16,21 +16,17 @@ services:
           name: pod-redis
           property: connectionString
       - key: MINIO_ENDPOINT
-        value: pod-minio
-      - key: MINIO_PORT
-        value: "9000"
+        value: http://pod-minio:9000
       - key: MINIO_ACCESS_KEY
         value: minioadmin
       - key: MINIO_SECRET_KEY
-        generateValue: true
+        value: minio_secret_change_me_in_production
       - key: MINIO_BUCKET
         value: digital-products
-      - key: MINIO_USE_SSL
-        value: "false"
       - key: AUTH_SECRET
-        generateValue: true
+        value: a91f7e3b2c8d4f6e1a0b5c7d9e2f4a6b8c0d1e3f5a7b9c2d4e6f8a0b1c3d5e7
       - key: AUTH_URL
-        value: https://pod-web.onrender.com
+        value: https://ecom-digital-products-store-with.onrender.com
       - key: AUTH_TRUST_HOST
         value: "true"
       - key: RAZORPAY_KEY_ID
@@ -41,10 +37,6 @@ services:
         sync: false
       - key: AUTH_GOOGLE_SECRET
         sync: false
-    disk:
-      name: minio-data
-      mountPath: /data
-      sizeGB: 10
     healthCheckPath: /api/health
     autoDeploy: true
 
@@ -57,7 +49,7 @@ services:
       - key: MINIO_ROOT_USER
         value: minioadmin
       - key: MINIO_ROOT_PASSWORD
-        generateValue: true
+        value: minio_secret_change_me_in_production
       - key: MINIO_BROWSER
         value: "off"
     disk:
