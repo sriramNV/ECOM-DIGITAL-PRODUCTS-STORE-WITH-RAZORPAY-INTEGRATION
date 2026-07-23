@@ -13,7 +13,7 @@ RUN pnpm --filter web exec prisma generate
 COPY . .
 RUN pnpm build
 
-RUN chown -R nextjs:nodejs /app
+RUN chown -R nextjs:nodejs /app && chmod +x docker-entrypoint.sh
 USER nextjs
 
 EXPOSE 3000
@@ -21,4 +21,4 @@ ENV PORT=3000
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-CMD ["pnpm", "start"]
+CMD ["sh", "docker-entrypoint.sh"]

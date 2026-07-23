@@ -65,10 +65,11 @@ services:
       mountPath: /data
       sizeGB: 10
 
+  - type: redis
+    name: pod-redis
+    plan: free
+
 databases:
   - name: pod-db
-    databaseName: digital-products
+    databaseName: digital_products
     user: pod
-
-redis:
-  - name: pod-redis
