@@ -43,8 +43,8 @@ services:
   - type: worker
     name: pod-minio
     env: docker
+    dockerfilePath: ./Dockerfile.minio
     dockerCommand: minio server /data --console-address ":9001"
-    dockerContext: .
     envVars:
       - key: MINIO_ROOT_USER
         value: minioadmin
