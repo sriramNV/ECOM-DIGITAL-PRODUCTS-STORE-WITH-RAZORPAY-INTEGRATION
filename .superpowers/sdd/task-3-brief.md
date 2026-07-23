@@ -1,399 +1,65 @@
-# Task 1.3: Set up Prisma with initial schema
+### Task 3: Create Dockerfile for worker
 
-**Plan:** Plan 01 — Foundation & Project Setup
-**Depends on:** Task 1.1 (monorepo), Task 1.2 (Docker with PostgreSQL running)
-**Produces:** Prisma client singleton, Redis client, PrismaClient type
+**Files:**
+- Create: `apps/web/Dockerfile.worker`
 
-## Files to Create/Modify
+**Interfaces:**
+- Consumes: `apps/web/lib/jobs/worker.ts` from Task 1, root `prisma/schema.prisma`
+- Produces: Production Docker image for worker service
 
-- Create: `prisma/schema.prisma`
-- Create: `apps/web/lib/prisma.ts`
-- Create: `apps/web/lib/redis.ts`
-- Create: `apps/web/lib/queue.ts`
-- Modify: `apps/web/package.json` (add prisma, ioredis, bull deps)
+- [ ] **Step 1: Create `apps/web/Dockerfile.worker`**
 
-## Steps
+```dockerfile
+# Stage 1: Dependencies + build
+FROM node:22-alpine AS builder
+RUN apk add --no-cache openssl libcrypto3 libssl3 && corepack enable && corepack prepare pnpm@9.0.0 --activate
+WORKDIR /app
 
-### Step 1: Install Prisma dependencies
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+RUN pnpm install
+
+# Prisma client (schema is at repo root)
+COPY prisma/schema.prisma ./prisma/schema.prisma
+RUN npx prisma generate --schema=./prisma/schema.prisma
+
+# Copy worker source
+COPY apps/web/lib/ ./apps/web/lib/
+COPY apps/web/tsconfig.json ./apps/web/tsconfig.json
+COPY apps/web/next-env.d.ts ./apps/web/next-env.d.ts
+
+# Stage 2: Runner
+FROM node:22-alpine AS runner
+RUN apk add --no-cache openssl libcrypto3 libssl3
+WORKDIR /app
+
+# Copy from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=builder /app/apps/web/lib ./apps/web/lib
+COPY --from=builder /app/apps/web/tsconfig.json ./apps/web/tsconfig.json
+COPY --from=builder /app/apps/web/next-env.d.ts ./apps/web/next-env.d.ts
+COPY --from=builder /app/prisma ./prisma
+
+CMD ["npx", "tsx", "apps/web/lib/jobs/worker.ts"]
+```
+
+- [ ] **Step 2: Build the image**
+
 ```bash
-pnpm add -D prisma --filter web
-pnpm add @prisma/client --filter web
-pnpm add ioredis --filter web
-pnpm add bull --filter web
+Set-Location D:\Projects\web\pod
+docker build -t pod-worker:latest -f apps/web/Dockerfile.worker .
 ```
 
-### Step 2: Create prisma/schema.prisma
+Expected: Build completes. Image is smaller than web image (no Next.js build output). Contains only worker-relevant code.
 
-```prisma
-generator client {
-  provider = "prisma-client-js"
-}
+- [ ] **Step 3: Commit**
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum Role {
-  ADMIN
-  CUSTOMER
-}
-
-enum OrderStatus {
-  PENDING_PAYMENT
-  PAID
-  PROCESSING
-  PRINTING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-  REFUNDED
-}
-
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String?
-  role      Role     @default(CUSTOMER)
-  image     String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  orders   Order[]
-  cart     Cart?
-  accounts Account[]
-  sessions Session[]
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model Cart {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items CartItem[]
-}
-
-model CartItem {
-  id        String   @id @default(cuid())
-  cartId    String
-  productId String
-  variantId String
-  quantity  Int      @default(1)
-  createdAt DateTime @default(now())
-
-  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product        @relation(fields: [productId], references: [id])
-  variant ProductVariant @relation(fields: [variantId], references: [id])
-}
-
-model Product {
-  id                String   @id @default(cuid())
-  title             String
-  slug              String   @unique
-  description       String   @db.Text
-  blueprintId       Int?
-  printProviderId   Int?
-  printifyProductId String?
-  basePrice         Decimal  @default(0)
-  marginPercent     Decimal  @default(0)
-  isActive          Boolean  @default(true)
-  isFeatured        Boolean  @default(false)
-  categoryId        String?
-  tags              String[]
-  metadata          Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  category    Category?  @relation(fields: [categoryId], references: [id])
-  variants    ProductVariant[]
-  images      ProductImage[]
-  collections CollectionProduct[]
-}
-
-model ProductVariant {
-  id                String  @id @default(cuid())
-  productId         String
-  printifyVariantId Int?
-  title             String
-  size              String?
-  color             String?
-  colorHex          String?
-  price             Decimal
-  isEnabled         Boolean @default(true)
-  stock             Int     @default(999)
-
-  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems CartItem[]
-}
-
-model ProductImage {
-  id        String  @id @default(cuid())
-  productId String
-  url       String
-  alt       String?
-  position  Int     @default(0)
-  isMockup  Boolean @default(false)
-
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  slug        String    @unique
-  description String?
-  image       String?
-  parentId    String?
-  order       Int       @default(0)
-  createdAt   DateTime  @default(now())
-
-  parent   Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children Category? @relation("CategoryHierarchy")
-  products Product[]
-}
-
-model Order {
-  id              String       @id @default(cuid())
-  orderNumber     String       @unique
-  userId          String
-  status          OrderStatus  @default(PENDING_PAYMENT)
-  totalAmount     Decimal
-  subtotalAmount  Decimal      @default(0)
-  shippingAmount  Decimal      @default(0)
-  taxAmount       Decimal      @default(0)
-  taxRate         Decimal      @default(18)
-  discountAmount  Decimal      @default(0)
-  couponId        String?
-  currency        String       @default("INR")
-  shippingAddress Json?
-  shippingMethod  String?
-  printifyOrderId String?
-  notes           String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  user          User              @relation(fields: [userId], references: [id])
-  items         OrderItem[]
-  payments      Payment[]
-  statusHistory OrderStatusHistory[]
-  coupon        Coupon?           @relation(fields: [couponId], references: [id])
-}
-
-model OrderItem {
-  id         String  @id @default(cuid())
-  orderId    String
-  productId  String
-  variantId  String
-  title      String
-  variant    String
-  quantity   Int
-  unitPrice  Decimal
-  totalPrice Decimal
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-}
-
-model Payment {
-  id                String        @id @default(cuid())
-  orderId           String
-  razorpayPaymentId String?
-  razorpayOrderId   String?
-  razorpaySignature String?
-  amount            Decimal
-  currency          String        @default("INR")
-  status            PaymentStatus @default(PENDING)
-  method            String?
-  createdAt         DateTime      @default(now())
-
-  order Order @relation(fields: [orderId], references: [id])
-}
-
-model OrderStatusHistory {
-  id        String      @id @default(cuid())
-  orderId   String
-  status    OrderStatus
-  note      String?
-  createdAt DateTime    @default(now())
-
-  order Order @relation(fields: [orderId], references: [id])
-}
-
-model Coupon {
-  id            String    @id @default(cuid())
-  code          String    @unique
-  type          String
-  value         Decimal
-  minOrder      Decimal   @default(0)
-  maxDiscount   Decimal?
-  usageLimit    Int?
-  perUserLimit  Int?
-  startDate     DateTime
-  endDate       DateTime?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-
-  orders Order[]
-}
-
-model Collection {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  description String?
-  image     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  products CollectionProduct[]
-}
-
-model CollectionProduct {
-  id           String @id @default(cuid())
-  collectionId String
-  productId    String
-  sortOrder    Int    @default(0)
-
-  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-model Page {
-  id          String   @id @default(cuid())
-  title       String
-  slug        String   @unique
-  content     Json?
-  seoTitle    String?
-  seoDesc     String?
-  isPublished Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Banner {
-  id        String   @id @default(cuid())
-  title     String
-  imageUrl  String
-  linkUrl   String?
-  position  String   @default("hero")
-  order     Int      @default(0)
-  startDate DateTime?
-  endDate   DateTime?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-}
-
-model EmailLog {
-  id        String   @id @default(cuid())
-  to        String
-  subject   String
-  type      String
-  orderId   String?
-  status    String
-  error     String?
-  createdAt DateTime @default(now())
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  action    String
-  entity    String
-  entityId  String?
-  metadata  Json?
-  ip        String?
-  createdAt DateTime @default(now())
-}
-```
-
-### Step 3: Create apps/web/lib/prisma.ts
-```typescript
-import { PrismaClient } from "@prisma/client";
-
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
-```
-
-### Step 4: Create apps/web/lib/redis.ts
-```typescript
-import Redis from "ioredis";
-
-const globalForRedis = globalThis as unknown as { redis: Redis };
-
-export const redis = globalForRedis.redis ?? new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
-
-if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
-```
-
-### Step 5: Create apps/web/lib/queue.ts
-```typescript
-import { Queue } from "bull";
-import { redis } from "./redis";
-
-export const abandonedCartQueue = new Queue("abandoned-cart", { redis: process.env.REDIS_URL as string });
-export const emailQueue = new Queue("email", { redis: process.env.REDIS_URL as string });
-export const fulfillmentQueue = new Queue("fulfillment", { redis: process.env.REDIS_URL as string });
-```
-
-### Step 6: Run initial migration
 ```bash
-cd apps/web
-npx prisma migrate dev --name init
-cd ../..
+git add apps/web/Dockerfile.worker
+git commit -m "feat: add Dockerfile for background worker service"
 ```
 
-Expected: `prisma/migrations/` directory created with initial migration SQL.
+---
 
-## Notes
-
-- Docker containers (postgres, redis) must be running for migration to work
-- The schema includes ALL models for the entire project (Users, Products, Orders, Payments, CMS, etc.)
-- After migration, run `npx prisma generate` if needed

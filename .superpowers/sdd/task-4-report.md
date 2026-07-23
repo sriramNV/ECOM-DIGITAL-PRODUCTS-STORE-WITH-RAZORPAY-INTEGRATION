@@ -1,16 +1,20 @@
-# Task 1.4 Report: Tailwind v4 with Design Tokens
+# Task 4 Report — docker-compose.yml update
 
-**Status:** ✅ Complete
+## Status: Done
 
 ## Commits
-- `1dbf587` — feat: set up Tailwind v4 with design tokens (Task 1.4)
+- `625a096` feat: add worker service to docker-compose.yml
 
-## Summary
-- Created `apps/web/postcss.config.mjs` with `@tailwindcss/postcss` plugin
-- Created `apps/web/app/globals.css` with design token CSS custom properties in `:root` and `@theme inline` block mapping to Tailwind v4 theme keys
-- Replaced `apps/web/app/layout.tsx` with styled version: Inter font via `next/font/google`, CSS variable `--font-sans`, globals.css import, metadata (title + description)
-- Replaced `apps/web/app/page.tsx` with placeholder: "POD Store" heading + "Coming soon." using project token classes (`text-foreground`, `text-foreground-muted`)
-- Verified `pnpm dev` starts and page renders correctly on localhost:3000 — HTML confirms Inter font variable on `<html>`, Tailwind classes rendered, title "POD Store" present
+## Files Changed
+| File | Action |
+|------|--------|
+| `docker-compose.yml` | Modified: added worker service block after web service |
+
+## Build Result
+`docker compose config` validates successfully — worker service parsed with all environment variables and dependencies.
 
 ## Concerns
-- Node processes from prior dev servers were left running; had to clean up before fresh start. No long-term issue.
+None. The worker service follows the same pattern as the existing web service.
+
+## Report File
+`.superpowers/sdd/task-4-report.md`

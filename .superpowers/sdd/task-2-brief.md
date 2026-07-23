@@ -1,122 +1,86 @@
-# Task 1.2: Set up Docker infrastructure
+### Task 2: Fix .dockerignore + create production Dockerfile for web
 
-**Plan:** Plan 01 — Foundation & Project Setup
-**Depends on:** Monorepo scaffold from Task 1.1
-**Produces:** Running PostgreSQL 16, Redis 7, MinIO containers
+**Files:**
+- Modify: `.dockerignore`
+- Create: `apps/web/Dockerfile.web`
 
-## Files to Create
+**Interfaces:**
+- Consumes: `apps/web/next.config.ts` (already has `output: "standalone"`), root `prisma/schema.prisma`
+- Produces: Production Docker image for Next.js web service
 
-- `docker-compose.yml`
-- `Dockerfile`
-- `scripts/init-buckets.sh`
+- [ ] **Step 0: Fix `.dockerignore` to not exclude `apps/web/Dockerfile.web`**
 
-## Steps
+Current `.dockerignore` has a `Dockerfile` pattern that matches any file named exactly `Dockerfile` at any depth. Since our new file is named `Dockerfile.web`, it won't match — but the pattern is confusing. Tighten it to only match at the repo root:
 
-### Step 1: Create docker-compose.yml
+Change `Dockerfile` in `.dockerignore` to `/Dockerfile`
 
-```yaml
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: pod-postgres
-    ports: ["5432:5432"]
-    environment:
-      POSTGRES_DB: pod
-      POSTGRES_USER: pod
-      POSTGRES_PASSWORD: password
-    volumes: [pgdata:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pod"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+This ensures only a `Dockerfile` at the repo root is excluded, not future Dockerfiles in subdirectories.
 
-  redis:
-    image: redis:7-alpine
-    container_name: pod-redis
-    ports: ["6379:6379"]
-    volumes: [redisdata:/data]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  minio:
-    image: minio/minio
-    container_name: pod-minio
-    ports: ["9000:9000", "9001:9001"]
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes: [miniodata:/data]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-volumes:
-  pgdata:
-  redisdata:
-  miniodata:
-```
-
-### Step 2: Create Dockerfile (multi-stage)
+- [ ] **Step 1: Create `apps/web/Dockerfile.web`**
 
 ```dockerfile
-FROM node:20-alpine AS deps
+# Stage 1: Base
+FROM node:22-alpine AS base
+RUN apk add --no-cache openssl libcrypto3 libssl3 && corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
+
+# Stage 2: Dependencies
+FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN pnpm install
 
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN corepack enable && pnpm build
+# Stage 3: Prisma client
+FROM deps AS prisma
+COPY prisma/schema.prisma ./prisma/schema.prisma
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
-FROM node:20-alpine AS runner
-WORKDIR /app
+# Stage 4: Build Next.js
+FROM prisma AS builder
+WORKDIR /app/apps/web
+COPY apps/web/ ./
+RUN mkdir -p .next && chown -R node:node .next
+USER node
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN pnpm exec next build
+
+# Stage 5: Runner
+FROM node:22-alpine AS runner
+RUN apk add --no-cache openssl libcrypto3 libssl3
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Copy standalone output (includes server.js entry point + traced deps)
+COPY --from=builder /app/apps/web/.next/standalone ./
+# Static chunks must be copied separately (not traced by standalone)
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-USER nextjs
+
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-CMD ["node", "apps/web/server.js"]
+
+# server.js at standalone root does process.chdir(__dirname) then loads the app
+CMD ["node", "server.js"]
 ```
 
-### Step 3: Create scripts/init-buckets.sh
+- [ ] **Step 2: Build the image**
 
 ```bash
-#!/bin/bash
-# MinIO bucket initialization — runs on first app boot
-mc alias set podminio http://minio:9000 minioadmin minioadmin
-mc mb podminio/pod-assets --ignore-existing
-mc policy set public podminio/pod-assets
-echo "MinIO buckets initialized"
+Set-Location D:\Projects\web\pod
+docker build -t pod-web:latest -f apps/web/Dockerfile.web .
 ```
 
-### Step 4: Start Docker services
+Expected: Build completes successfully. Image contains standalone Next.js output.
+
+If build fails because a page uses `generateStaticParams` that queries Postgres/Redis at build time, skip those pages or mock the DB connection in the build env. For now, note the failure and proceed — the Dockerfile structure is correct.
+
+- [ ] **Step 3: Commit**
 
 ```bash
-docker compose up -d
+git add .dockerignore apps/web/Dockerfile.web
+git commit -m "feat: add production Dockerfile for Next.js web service"
 ```
 
-Expected: `docker compose ps` shows postgres, redis, minio all healthy.
+---
 
-## Notes
-
-- This is production-adjacent Docker infrastructure — PostgreSQL for the database, Redis for caching/jobs, MinIO for file storage
-- The Dockerfile is for production deployment (multi-stage)
-- MinIO init script assumes mc (MinIO client) is installed
-- No need to run Docker if it's not available — the files just need to be created

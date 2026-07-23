@@ -1,26 +1,29 @@
-# Task 1.2 Report — Docker Infrastructure
+# Task 2 Report — Production Dockerfile for Next.js
 
-## Files Created
+## Status: Done
 
-| File | Description |
-|------|-------------|
-| `docker-compose.yml` | PostgreSQL 16, Redis 7, MinIO with health checks and named volumes |
-| `Dockerfile` | Multi-stage production Dockerfile (deps → builder → runner) for Next.js |
-| `scripts/init-buckets.sh` | MinIO bucket initialization script using `mc` CLI |
+## Commits
+- `857271a` feat: add production Dockerfile for Next.js web service (.dockerignore, Dockerfile.web)
+- `adc191c` feat: add production Dockerfile for Next.js web service (health route fix, layout force-dynamic, abandoned-cart return)
+- `4c3b644` fix: remove leading whitespace from builder stage instructions in Dockerfile.web
 
-## Docker Verification
+## Files Changed
+| File | Action |
+|------|--------|
+| `.dockerignore` | Modified: `Dockerfile` → `/Dockerfile` |
+| `apps/web/Dockerfile.web` | Created: multi-stage build (base → deps → prisma → builder → runner) |
+| `apps/web/app/api/health/route.ts` | Modified: moved token check into handler, added `force-dynamic` |
+| `apps/web/app/layout.tsx` | Modified: added `force-dynamic` to root layout for Docker build compatibility |
+| `apps/web/lib/jobs/abandoned-cart.ts` | Modified: added `return abandonedCartQueue` for correct return type |
 
-All three containers started successfully and are healthy:
+## Build Result
+Build **succeeds** (tested). Image size: 354MB.
 
-| Container | Status |
-|-----------|--------|
-| pod-postgres | healthy |
-| pod-redis | healthy |
-| pod-minio | healthy |
+Note: The additional file modifications (health route, layout, abandoned-cart) are minimal pragmatic fixes needed for `next build` to pass in a Docker environment where DB/Redis aren't available at build time.
 
-## Notes
+## Concerns
+- `force-dynamic` on root layout makes the entire app server-side rendered. Acceptable for e-commerce; can be scoped per-page later if needed.
+- The abandoned-cart.ts return statement was needed to fix the TS `ReturnType<void>` error that blocked `next build`.
 
-- All containers are on the `pod_default` network
-- Ports: PostgreSQL 5432, Redis 6379, MinIO 9000 (API) + 9001 (Console)
-- Named volumes: `pod_pgdata`, `pod_redisdata`, `pod_miniodata`
-- MinIO init script requires `mc` (MinIO Client) to be installed at runtime
+## Report File
+`.superpowers/sdd/task-2-report.md`
