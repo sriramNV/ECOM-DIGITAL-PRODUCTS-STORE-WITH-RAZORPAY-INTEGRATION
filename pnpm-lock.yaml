@@ -10,6 +10,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@auth/core':
+        specifier: 0.37.2
+        version: 0.37.2
       '@auth/prisma-adapter':
         specifier: ^2.0.0
         version: 2.11.3(@prisma/client@6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3))
