@@ -60,6 +60,7 @@ services:
   - type: redis
     name: pod-redis
     plan: free
+    ipAllowList: []
 
 databases:
   - name: pod-db
