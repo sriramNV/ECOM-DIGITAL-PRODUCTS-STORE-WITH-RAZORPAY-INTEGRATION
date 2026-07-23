@@ -1,4 +1,4 @@
-import { uploadFile, getDownloadUrl, BUCKET } from "@/lib/storage";
+import { uploadFile, getDownloadUrl } from "@/lib/storage";
 
 const ZIP_MAGIC_BYTES = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
@@ -25,10 +25,10 @@ export async function uploadProductFile(
   buffer: Buffer
 ) {
   const fileKey = generateFileKey(productId, version, filename);
-  await uploadFile(fileKey, buffer, "application/zip");
+  await uploadFile(fileKey, buffer);
   return fileKey;
 }
 
-export async function getProductDownloadUrl(fileKey: string) {
-  return getDownloadUrl(fileKey, 900);
+export function getProductDownloadUrl(fileKey: string) {
+  return getDownloadUrl(fileKey);
 }

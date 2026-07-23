@@ -15,14 +15,8 @@ services:
           type: redis
           name: pod-redis
           property: connectionString
-      - key: MINIO_ENDPOINT
-        value: http://pod-minio:9000
-      - key: MINIO_ACCESS_KEY
-        value: minioadmin
-      - key: MINIO_SECRET_KEY
-        value: minio_secret_change_me_in_production
-      - key: MINIO_BUCKET
-        value: digital-products
+      - key: UPLOAD_DIR
+        value: /data/uploads
       - key: AUTH_SECRET
         value: a91f7e3b2c8d4f6e1a0b5c7d9e2f4a6b8c0d1e3f5a7b9c2d4e6f8a0b1c3d5e7
       - key: AUTH_URL
@@ -37,25 +31,12 @@ services:
         sync: false
       - key: AUTH_GOOGLE_SECRET
         sync: false
+    disk:
+      name: uploads
+      mountPath: /data
+      sizeGB: 1
     healthCheckPath: /api/health
     autoDeploy: true
-
-  - type: worker
-    name: pod-minio
-    env: docker
-    dockerfilePath: ./Dockerfile.minio
-    dockerCommand: minio server /data --console-address ":9001"
-    envVars:
-      - key: MINIO_ROOT_USER
-        value: minioadmin
-      - key: MINIO_ROOT_PASSWORD
-        value: minio_secret_change_me_in_production
-      - key: MINIO_BROWSER
-        value: "off"
-    disk:
-      name: minio-data
-      mountPath: /data
-      sizeGB: 10
 
   - type: redis
     name: pod-redis

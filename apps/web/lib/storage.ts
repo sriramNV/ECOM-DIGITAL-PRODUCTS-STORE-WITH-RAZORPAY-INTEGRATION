@@ -1,35 +1,28 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { writeFile, readFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
+import { join, dirname } from "path";
 
-const s3Client = new S3Client({
-  endpoint: process.env.MINIO_ENDPOINT!,
-  region: "us-east-1",
-  credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY!,
-    secretAccessKey: process.env.MINIO_SECRET_KEY!,
-  },
-  forcePathStyle: true,
-});
+let uploadDir: string;
 
-const BUCKET = process.env.MINIO_BUCKET!;
-
-export async function uploadFile(key: string, buffer: Buffer, contentType: string) {
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-    })
-  );
+export function getUploadDir() {
+  if (!uploadDir) {
+    uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), "uploads");
+  }
+  return uploadDir;
 }
 
-export async function getDownloadUrl(key: string, expiresIn = 900) {
-  return getSignedUrl(
-    s3Client,
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-    { expiresIn }
-  );
+export async function uploadFile(key: string, buffer: Buffer) {
+  const filePath = join(getUploadDir(), key);
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, buffer);
 }
 
-export { BUCKET };
+export async function getFileBuffer(key: string) {
+  const filePath = join(getUploadDir(), key);
+  if (!existsSync(filePath)) return null;
+  return readFile(filePath);
+}
+
+export async function getDownloadUrl(key: string) {
+  return `/api/files/download?key=${encodeURIComponent(key)}`;
+}
