@@ -110,6 +110,12 @@ export async function updateProduct(slug: string, data: any) {
       ...(data.tags !== undefined && { tags: data.tags }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
       ...(data.isFeatured !== undefined && { isFeatured: data.isFeatured }),
+      ...(data.imageUrls !== undefined && {
+        images: {
+          deleteMany: {},
+          create: data.imageUrls.map((img: any, i: number) => ({ url: img.url, alt: img.alt || null, position: i })),
+        },
+      }),
     },
     include: productInclude,
   });

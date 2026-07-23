@@ -67,6 +67,49 @@ export async function verifyPayment(payload: {
   return expectedSignature === payload.razorpay_signature;
 }
 
+export async function createOrderFromCart(userId: string) {
+  const cart = await prisma.cart.findUnique({
+    where: { userId },
+    include: { items: { include: { product: true } } },
+  });
+
+  if (!cart?.items.length) throw new Error("Cart is empty");
+
+  const subtotal = cart.items.reduce(
+    (sum, item) => sum + Number(item.product.salePrice || item.product.price) * item.quantity,
+    0
+  );
+
+  const order = await prisma.order.create({
+    data: {
+      orderNumber: generateOrderNumber(),
+      userId,
+      status: "PAID",
+      subtotalAmount: subtotal,
+      totalAmount: subtotal,
+      items: {
+        create: cart.items.map((item) => ({
+          productId: item.productId,
+          title: item.product.title,
+          quantity: item.quantity,
+          unitPrice: item.product.salePrice || item.product.price,
+          totalPrice: Number(item.product.salePrice || item.product.price) * item.quantity,
+        })),
+      },
+      statusHistory: {
+        create: [
+          { status: "PENDING_PAYMENT" },
+          { status: "PAID" },
+        ],
+      },
+    },
+  });
+
+  await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+  return order;
+}
+
 export async function createOrderFromPayment(
   userId: string,
   razorpayOrderId: string,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/stores/cart-store";
@@ -13,29 +13,44 @@ declare global {
 }
 
 export default function CheckoutPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const { items, totalAmount, clearCart } = useCartStore();
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  if (!session) {
-    router.push("/auth/login");
-    return null;
-  }
+  useEffect(() => {
+    setHydrated(useCartStore.persist.hasHydrated());
+    const unsub = useCartStore.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, []);
 
-  if (items.length === 0) {
-    router.push("/cart");
-    return null;
-  }
+  useEffect(() => {
+    if (status === "unauthenticated") router.push("/auth/login");
+  }, [status, router]);
+
+  useEffect(() => {
+    if (hydrated && status === "authenticated" && items.length === 0) router.push("/cart");
+  }, [hydrated, status, items, router]);
+
+  if (status === "loading" || !hydrated) return <div className="flex min-h-screen items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
+  if (status === "unauthenticated" || (hydrated && items.length === 0)) return null;
 
   async function handlePayment() {
     setLoading(true);
     try {
-      const orderRes = await fetch("/api/razorpay/create-order", {
+      const syncRes = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ items }),
       });
+      if (!syncRes.ok) {
+        toast.error("Failed to sync cart");
+        setLoading(false);
+        return;
+      }
+
+      const orderRes = await fetch("/api/orders", { method: "POST" });
 
       if (!orderRes.ok) {
         const err = await orderRes.json();
@@ -45,42 +60,9 @@ export default function CheckoutPage() {
       }
 
       const order = await orderRes.json();
-
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: order.amountInPaise,
-        currency: "INR",
-        name: "Nexus Store",
-        description: "Digital Products",
-        order_id: order.razorpayOrderId,
-        handler: async function (response: any) {
-          const verifyRes = await fetch("/api/razorpay/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              amount: order.amount,
-            }),
-          });
-
-          if (verifyRes.ok) {
-            const data = await verifyRes.json();
-            clearCart();
-            toast.success("Payment successful!");
-            router.push(`/account/orders/${data.id}`);
-          } else {
-            toast.error("Payment verification failed");
-          }
-        },
-        modal: { ondismiss: () => setLoading(false) },
-        prefill: { email: session!.user?.email || "" },
-        theme: { color: "#00f0ff" },
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
+      clearCart();
+      toast.success("Payment successful!");
+      router.push(`/account/orders/${order.id}`);
     } catch (error) {
       toast.error("Something went wrong");
       setLoading(false);

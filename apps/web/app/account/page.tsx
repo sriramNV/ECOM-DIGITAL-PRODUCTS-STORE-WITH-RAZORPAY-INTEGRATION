@@ -1,7 +1,11 @@
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { buttonVariants } from "@/lib/button-variants";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { DeleteAccountButton, DownloadAllButton } from "@/components/account/account-actions";
 
 export default async function AccountPage() {
   const session = await auth();
@@ -17,8 +21,9 @@ export default async function AccountPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-2 text-3xl font-bold">Welcome, {session.user.name || "User"}</h1>
-      <div className="mb-10 flex gap-4">
-        <Link href="/account/orders" className="text-sm text-primary hover:underline">View All Orders</Link>
+      <div className="mb-10 flex flex-wrap gap-3">
+        <Link href="/account/orders" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>View All Orders</Link>
+        <DownloadAllButton />
       </div>
 
       <h2 className="mb-4 text-xl font-semibold">Recent Orders</h2>
@@ -42,6 +47,10 @@ export default async function AccountPage() {
           ))}
         </div>
       )}
+
+      <div className="mt-12">
+        <DeleteAccountButton />
+      </div>
     </div>
   );
 }

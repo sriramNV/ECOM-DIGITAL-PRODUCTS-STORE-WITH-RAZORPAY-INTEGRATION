@@ -1,0 +1,74 @@
+services:
+  - type: web
+    name: pod-web
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pod-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: pod-redis
+          property: connectionString
+      - key: MINIO_ENDPOINT
+        value: pod-minio
+      - key: MINIO_PORT
+        value: "9000"
+      - key: MINIO_ACCESS_KEY
+        value: minioadmin
+      - key: MINIO_SECRET_KEY
+        generateValue: true
+      - key: MINIO_BUCKET
+        value: digital-products
+      - key: MINIO_USE_SSL
+        value: "false"
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_URL
+        value: https://pod-web.onrender.com
+      - key: AUTH_TRUST_HOST
+        value: "true"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: AUTH_GOOGLE_ID
+        sync: false
+      - key: AUTH_GOOGLE_SECRET
+        sync: false
+    disk:
+      name: minio-data
+      mountPath: /data
+      sizeGB: 10
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  - type: worker
+    name: pod-minio
+    env: docker
+    dockerCommand: minio server /data --console-address ":9001"
+    dockerContext: .
+    envVars:
+      - key: MINIO_ROOT_USER
+        value: minioadmin
+      - key: MINIO_ROOT_PASSWORD
+        generateValue: true
+      - key: MINIO_BROWSER
+        value: "off"
+    disk:
+      name: minio-data
+      mountPath: /data
+      sizeGB: 10
+
+databases:
+  - name: pod-db
+    databaseName: digital-products
+    user: pod
+
+redis:
+  - name: pod-redis

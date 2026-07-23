@@ -8,6 +8,7 @@ import { useCartStore } from "@/stores/cart-store";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, User, LogOut, Sun, Moon, Menu } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -18,8 +19,9 @@ export function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const totalItems = useCartStore((s) => s.totalItems());
+  const clearCart = useCartStore((s) => s.clearCart);
+  const { theme, toggle: toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [dark, setDark] = useState(true);
 
   return (
     <motion.header
@@ -37,7 +39,7 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm transition-colors hover:text-primary ${pathname === link.href ? "text-primary" : "text-muted-foreground"}`}
+               className={`text-[15px] transition-colors hover:text-primary ${pathname === link.href ? "text-primary" : "text-muted-foreground"}`}
             >
               {link.label}
             </Link>
@@ -45,8 +47,8 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setDark(!dark)} title="Toggle theme">
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme">
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
           <Link href="/cart">
@@ -68,7 +70,7 @@ export function Navbar() {
               {(session.user as any).role === "ADMIN" && (
                 <Link href="/admin"><Button variant="ghost" size="sm">Admin</Button></Link>
               )}
-              <Button variant="ghost" size="icon" onClick={() => signOut()}><LogOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => { clearCart(); signOut(); }}><LogOut className="h-4 w-4" /></Button>
             </div>
           ) : (
             <Link href="/auth/login"><Button size="sm">Sign in</Button></Link>
@@ -87,7 +89,7 @@ export function Navbar() {
           className="border-t border-border px-4 pb-4 md:hidden"
         >
           {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="block py-2 text-sm" onClick={() => setMobileOpen(false)}>
+            <Link key={link.href} href={link.href} className="block py-2 text-[15px]" onClick={() => setMobileOpen(false)}>
               {link.label}
             </Link>
           ))}

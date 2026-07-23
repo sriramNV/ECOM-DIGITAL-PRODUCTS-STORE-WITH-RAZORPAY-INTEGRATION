@@ -1,1 +1,56 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 93%;
+    --foreground: 30 15% 12%;
+    --card: 40 15% 96%;
+    --card-foreground: 30 15% 12%;
+    --primary: 0 80% 55%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 40 15% 88%;
+    --secondary-foreground: 30 10% 20%;
+    --muted: 40 15% 88%;
+    --muted-foreground: 30 10% 40%;
+    --accent: 30 100% 55%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 15% 82%;
+    --input: 40 15% 82%;
+    --ring: 0 80% 55%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 5.9%;
+    --card-foreground: 0 0% 98%;
+    --primary: 0 80% 55%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 30 100% 55%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 0 80% 55%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; font-family: system-ui, -apple-system, sans-serif; }
+}
+
+@layer utilities {
+  .neon-glow { @apply shadow-[0_0_20px_hsl(var(--primary)/0.5)]; }
+  .glass-panel { @apply bg-card/80 backdrop-blur-xl border border-border; }
+}

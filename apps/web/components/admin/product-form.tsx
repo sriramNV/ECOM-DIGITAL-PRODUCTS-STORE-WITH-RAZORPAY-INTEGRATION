@@ -24,6 +24,21 @@ export function ProductForm({ product, categories, isNew }: Props) {
     categoryId: product?.categoryId || "",
     isActive: product?.isActive ?? true,
   });
+  const [images, setImages] = useState<{ url: string; alt: string }[]>(
+    product?.images?.map((img: any) => ({ url: img.url, alt: img.alt || "" })) || [{ url: "", alt: "" }]
+  );
+
+  function updateImage(index: number, field: "url" | "alt", value: string) {
+    setImages((prev) => prev.map((img, i) => (i === index ? { ...img, [field]: value } : img)));
+  }
+
+  function addImage() {
+    setImages((prev) => [...prev, { url: "", alt: "" }]);
+  }
+
+  function removeImage(index: number) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,10 +48,11 @@ export function ProductForm({ product, categories, isNew }: Props) {
       ...form,
       price: parseFloat(form.price),
       salePrice: form.salePrice ? parseFloat(form.salePrice) : null,
+      imageUrls: images.filter((img) => img.url.trim()),
     };
 
     const res = await fetch(isNew ? "/api/admin/products" : `/api/admin/products/${product.slug}`, {
-      method: isNew ? "POST" : "PATCH",
+      method: isNew ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -71,6 +87,23 @@ export function ProductForm({ product, categories, isNew }: Props) {
         <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
         Active
       </label>
+      <div className="rounded-xl border border-border p-4">
+        <h3 className="mb-4 font-medium">Product Images</h3>
+        <div className="space-y-3">
+          {images.map((img, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className="flex-1 space-y-2">
+                <Input placeholder="Image URL" value={img.url} onChange={(e) => updateImage(i, "url", e.target.value)} />
+                <Input placeholder="Alt text (optional)" value={img.alt} onChange={(e) => updateImage(i, "alt", e.target.value)} />
+              </div>
+              {images.length > 1 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => removeImage(i)} className="mt-0">Remove</Button>
+              )}
+            </div>
+          ))}
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={addImage} className="mt-3">Add Image</Button>
+      </div>
       {!isNew && product && (
         <div className="rounded-xl border border-border p-4">
           <h3 className="mb-4 font-medium">File Upload</h3>

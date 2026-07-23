@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { useSession } from "next-auth/react";
 
 export function CtaSection() {
+  const { data: session } = useSession();
+
+  if (session) return null;
+
   return (
     <section className="border-t border-border py-20">
       <motion.div

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { userGuard } from "@/lib/guard";
 import { getUserOrders } from "@/lib/services/orders";
+import { createOrderFromCart } from "@/lib/services/payments";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   const user = await userGuard();
@@ -14,4 +16,21 @@ export async function GET(req: Request) {
   );
 
   return NextResponse.json(orders);
+}
+
+export async function POST() {
+  const user = await userGuard();
+  if (user instanceof NextResponse) return user;
+
+  const { allowed } = await rateLimit(`order:${user.id}`, 5, 3600);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many orders. Try again later." }, { status: 429 });
+  }
+
+  try {
+    const order = await createOrderFromCart(user.id);
+    return NextResponse.json(order);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 }

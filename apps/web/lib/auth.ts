@@ -17,6 +17,7 @@ declare module "@auth/core/jwt" {
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  trustHost: !!process.env.AUTH_TRUST_HOST,
   pages: { signIn: "/auth/login", newUser: "/auth/register" },
   providers: [
     Google,
