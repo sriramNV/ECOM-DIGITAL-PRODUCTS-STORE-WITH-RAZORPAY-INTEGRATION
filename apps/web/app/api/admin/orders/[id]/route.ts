@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const guard = await adminGuard();
   if (guard) return guard;
 
@@ -23,7 +24,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json(order);
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const guard = await adminGuard();
   if (guard) return guard;
 

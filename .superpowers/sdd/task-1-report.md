@@ -1,57 +1,47 @@
-# Task 1.1: Scaffold Next.js 16 Monorepo - Report
+# Task 1 Report: Clean Up Existing Project
 
 ## What was implemented
 
-Created a pnpm workspace monorepo with Turborepo for the POD e-commerce platform. The scaffold includes a Next.js 16 app (`apps/web`), a shared types package (`packages/shared`), and all configuration files needed for development.
+Deleted all old POD e-commerce source files and config, preserved essential files, and scaffolded new root workspace configuration for the digital products platform.
 
-## Files created
+## Files Changed
 
-| File | Purpose |
-|------|---------|
-| `package.json` | Root package.json with turbo scripts, devDependencies |
-| `turbo.json` | Turborepo task configuration |
-| `pnpm-workspace.yaml` | pnpm workspace definition |
-| `apps/web/package.json` | Next.js 16 + React 19 app dependencies |
-| `apps/web/tsconfig.json` | TypeScript strict config with `@/*` path alias |
-| `apps/web/next.config.ts` | Next.js config (standalone output, images) |
-| `apps/web/app/layout.tsx` | Minimal root layout (required for Next.js) |
-| `apps/web/app/page.tsx` | Minimal home page |
-| `.gitignore` | Git ignore rules |
-| `.prettierrc` | Prettier config |
-| `.env.example` | Environment variables template |
-| `packages/shared/package.json` | `@pod/shared` package definition |
-| `packages/shared/tsconfig.json` | Shared package TypeScript config |
+**Deleted (entire directories):**
+- `apps/` — old Next.js app
+- `packages/` — old shared packages
+- `prisma/` — old database schema
+- `scripts/` — old utility scripts
+- `tests/` — old test suites
+- `nginx/` — old nginx config
+- `.turbo/` — turbo cache
+- `playwright-report/` — old test reports
+- `test-results/` — old test results
+- `node_modules/` — old dependencies
 
-## pnpm install output
+**Deleted (individual files):**
+- `CONTRIBUTING.md`, `DEPLOYMENT.md`
+- `docker-compose.yml`, `docker-compose.prod.yml`, `Dockerfile.dev`
+- `playwright.config.ts`, `vitest.config.ts`, `turbo.json`
+- `pnpm-lock.yaml`, `.prettierrc`
+- `.next-dev*.log`, `dev-server*.log`
 
-- Scope: 3 workspace projects (pod, web, @pod/shared)
-- Resolved 190 packages, 88 added
-- Tools: Prettier 3.9.5, Turbo 2.10.5, TypeScript 5.9.3
-- Warnings:
-  - pnpm 9.0.0 is outdated (11.15.0 available) — expected, brief specifies 9.0.0
-  - TypeScript 7.0.2 and Vitest 4.1.10 available — expected, brief specifies versions
-- Duration: 51.6 seconds
-- **No errors**
+**Created (root workspace files):**
+- `package.json` — renamed to `digital-products` with pnpm filter scripts
+- `pnpm-workspace.yaml` — points to `apps/*`
+- `tsconfig.json` — strict base TypeScript config
+- `.env.example` — new environment template (digital products platform)
 
-## pnpm dev verification
+**Preserved:**
+- `.git/`, `.gitignore`, `.opencode/`, `.superpowers/`, `docs/`, `skills-lock.json`, `.env`, `.agents/`, `.github/`, `context/`, `skill-observations/`, `.dockerignore`, `README.md`, `docs/`
 
-`pnpm dev` started successfully via Turborepo:
+## Self-Review Findings
 
-- **Next.js 16.2.10** (Turbopack)
-- Ready in 798ms
-- Local: http://localhost:3000
-- Server started and served the empty page
-- **Pass**
+- All specified files/directories were deleted successfully
+- All specified preserve items are intact
+- New root workspace files match the task spec exactly
+- Commit captures 249 file changes (18,696 lines removed, 4,711 added)
+- No concerns — workspace is clean and ready for further tasks
 
-Note: Next.js auto-modified `tsconfig.json` (changed `jsx` from `"preserve"` to `"react-jsx"`, added `.next/dev/types/**/*.ts` to include). This is standard Next.js behavior.
+## Issues or Concerns
 
-## Issues or concerns
-
-1. **Minimal app pages added**: The brief didn't specify creating `app/layout.tsx` and `app/page.tsx`, but Next.js requires at least these files to start. Created minimal empty placeholder pages.
-2. **tsconfig.json auto-modified by Next.js**: Running `pnpm dev` causes Next.js to rewrite `tsconfig.json` with mandatory changes. This is expected and all IDEs handle it.
-3. **pnpm version**: Using pnpm 9.0.0 per the brief, though the latest is 11.x. Should be fine for now.
-4. **No `.nvmrc` or `.node-version`**: Node.js >=20.0.0 specified in engines, but no specific node version file.
-
-## Commit
-
-`859831c` - Scaffold Next.js 16 monorepo (Task 1.1)
+None.

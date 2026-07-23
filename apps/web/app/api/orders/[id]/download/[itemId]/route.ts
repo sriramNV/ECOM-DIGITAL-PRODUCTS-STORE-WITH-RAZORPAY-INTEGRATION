@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { userGuard } from "@/lib/guard";
 import { generateDownloadUrl } from "@/lib/services/orders";
 
-export async function GET(req: Request, { params }: { params: { id: string; itemId: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string; itemId: string }> }) {
+  const params = await props.params;
   const user = await userGuard();
   if (user instanceof NextResponse) return user;
 

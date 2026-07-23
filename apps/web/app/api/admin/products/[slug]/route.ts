@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { updateProduct, deleteProduct } from "@/lib/services/products";
 
-export async function PUT(req: Request, { params }: { params: { slug: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const guard = await adminGuard();
   if (guard) return guard;
 
@@ -14,7 +15,8 @@ export async function PUT(req: Request, { params }: { params: { slug: string } }
   return NextResponse.json(product);
 }
 
-export async function DELETE(req: Request, { params }: { params: { slug: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const guard = await adminGuard();
   if (guard) return guard;
 

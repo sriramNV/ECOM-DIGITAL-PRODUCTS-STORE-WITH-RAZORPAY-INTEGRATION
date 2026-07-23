@@ -1,208 +1,182 @@
-# Task 1.5: Create base libraries and types
+# Task 5: Auth Service + NextAuth Configuration
 
-**Plan:** Plan 01 — Foundation & Project Setup
-**Depends on:** Task 1.3 (prisma, redis clients), Task 1.4 (Tailwind)
-**Produces:** Utility functions used by all subsequent plans
+## Context
+Utility modules created. Now set up NextAuth v5 with credentials + Google OAuth.
 
-## Files to Create
+## Requirements
 
-- `apps/web/lib/logger.ts`
-- `apps/web/lib/utils.ts`
-- `apps/web/lib/order-number.ts`
-- `apps/web/types/index.ts`
-- `apps/web/data/site.ts`
-- `apps/web/app/api/health/route.ts`
+### Create `apps/web/lib/auth.ts` — NextAuth configuration
+```ts
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { compare } from "bcryptjs";
+import { prisma } from "./db";
 
-## Steps
+declare module "next-auth" {
+  interface User { role?: string }
+  interface Session { user: { id: string; role: string; name?: string | null; email?: string | null; image?: string | null } }
+}
 
-### Step 1: Create apps/web/lib/logger.ts
-```typescript
-import pino from "pino";
+declare module "next-auth/jwt" {
+  interface JWT { id: string; role: string }
+}
 
-export const logger = pino({
-  level: process.env.LOG_LEVEL ?? "info",
-  transport:
-    process.env.NODE_ENV === "development"
-      ? { target: "pino-pretty", options: { colorize: true } }
-      : undefined,
-  redact: {
-    paths: ["req.headers.authorization", "req.headers.cookie", "body.password"],
-    censor: "[REDACTED]",
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  session: { strategy: "jwt" },
+  pages: { signIn: "/auth/login", newUser: "/auth/register" },
+  providers: [
+    Google,
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email as string },
+        });
+        if (!user || !user.password) return null;
+        const isValid = await compare(credentials.password as string, user.password);
+        if (!isValid) return null;
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as any).role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).id = token.id;
+        (session.user as any).role = token.role;
+      }
+      return session;
+    },
   },
 });
 ```
 
-### Step 2: Create apps/web/lib/utils.ts
-```typescript
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export function formatCurrency(amount: number | string, currency = "INR"): string {
-  const value = typeof amount === "string" ? Number.parseFloat(amount) : amount;
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-export function formatDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
-
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
+### Create `apps/web/app/api/auth/[...nextauth]/route.ts`
+```ts
+import { handlers } from "@/lib/auth";
+export const { GET, POST } = handlers;
 ```
 
-### Step 3: Create apps/web/lib/order-number.ts
-```typescript
-import { redis } from "./redis";
-import { logger } from "./logger";
-
-const COUNTER_KEY = "order:counter";
-
-export async function generateOrderNumber(): Promise<string> {
-  try {
-    const exists = await redis.exists(COUNTER_KEY);
-    if (!exists) {
-      await redis.set(COUNTER_KEY, 100000);
-    }
-    const count = await redis.incr(COUNTER_KEY);
-    return `POD-${String(count).padStart(6, "0")}`;
-  } catch (error) {
-    logger.warn({ error }, "Redis unavailable for order counter, using fallback");
-    const ts = Date.now().toString(36).toUpperCase();
-    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `POD-${ts}${rand}`;
-  }
-}
-```
-
-### Step 4: Create apps/web/types/index.ts
-```typescript
-export type Role = "ADMIN" | "CUSTOMER";
-
-export type OrderStatus =
-  | "PENDING_PAYMENT"
-  | "PAID"
-  | "PROCESSING"
-  | "PRINTING"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "CANCELLED"
-  | "REFUNDED";
-
-export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
-
-export type CartItem = {
-  id: string;
-  productId: string;
-  variantId: string;
-  title: string;
-  image: string;
-  price: number;
-  quantity: number;
-  size: string;
-  color: string;
-  slug: string;
-};
-
-export type Address = {
-  name: string;
-  street: string;
-  city: string;
-  state: string;
-  pincode: string;
-  country: string;
-  phone: string;
-};
-```
-
-### Step 5: Create apps/web/data/site.ts
-```typescript
-export const siteConfig = {
-  name: "POD Store",
-  description: "Premium print-on-demand products",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-  currency: "INR",
-  taxRate: 18,
-  shipping: {
-    freeThreshold: 999,
-    standard: 99,
-    express: 199,
-  },
-  email: {
-    from: process.env.SMTP_FROM ?? "store@podstore.com",
-  },
-  social: {
-    instagram: "#",
-    twitter: "#",
-  },
-  navbar: {
-    links: [
-      { label: "Products", href: "/products" },
-      { label: "About", href: "/about" },
-      { label: "Contact", href: "/contact" },
-    ],
-  },
-};
-```
-
-### Step 6: Create apps/web/app/api/health/route.ts
-```typescript
+### Create `apps/web/app/api/auth/register/route.ts`
+```ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { redis } from "@/lib/redis";
-import { logger } from "@/lib/logger";
+import { hash } from "bcryptjs";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
 
-export async function GET() {
-  const checks: Record<string, string> = {};
+const schema = z.object({
+  name: z.string().min(2).max(50),
+  email: z.string().email(),
+  password: z.string().min(6).max(100),
+});
 
+export async function POST(req: Request) {
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    checks.database = "ok";
-  } catch {
-    checks.database = "error";
+    const body = await req.json();
+    const { name, email, password } = schema.parse(body);
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+    }
+
+    const hashedPassword = await hash(password, 12);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword },
+    });
+
+    return NextResponse.json(
+      { id: user.id, name: user.name, email: user.email },
+      { status: 201 }
+    );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors }, { status: 422 });
+    }
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  try {
-    await redis.ping();
-    checks.redis = "ok";
-  } catch {
-    checks.redis = "error";
-  }
-
-  const healthy = Object.values(checks).every((v) => v === "ok");
-
-  if (!healthy) {
-    logger.error({ checks }, "Health check failed");
-    return NextResponse.json({ status: "unhealthy", checks }, { status: 503 });
-  }
-
-  return NextResponse.json({ status: "healthy", checks });
 }
 ```
 
-## Notes
+### Create `apps/web/app/providers.tsx`
+```tsx
+"use client";
 
-- Need to install deps: `pnpm add pino pino-pretty clsx tailwind-merge --filter web`
-- The health route imports `@/lib/prisma` and `@/lib/redis` which exist from Task 1.3
-- The `@/*` path alias is configured in tsconfig (Task 1.1)
-- All files will be under `apps/web/`
+import { SessionProvider } from "next-auth/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+import { Toaster } from "sonner";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient());
+
+  return (
+    <SessionProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster position="top-right" />
+      </QueryClientProvider>
+    </SessionProvider>
+  );
+}
+```
+
+### Create `apps/web/app/layout.tsx`
+```tsx
+import type { Metadata } from "next";
+import { Providers } from "./providers";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Nexus Store — Digital Products",
+  description: "Premium digital products for creators and developers",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+### Create `apps/web/app/globals.css` (basic Tailwind setup)
+```css
+@import "tailwindcss";
+```
+
+### Install deps
+Run: `pnpm --filter web add next-auth@5.0.0-beta.25 @auth/prisma-adapter bcryptjs zod @tanstack/react-query sonner zustand framer-motion clsx tailwind-merge class-variance-authority lucide-react`
+Run: `pnpm --filter web add -D @types/bcryptjs`
+
+### Create postcss.config.ts (for Tailwind)
+```ts
+export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+```
+
+## Steps
+1. Create all files listed above
+2. Install dependencies
+3. Verify the Next.js app compiles by running `pnpm --filter web build` (or try `pnpm --filter web dev` and check for errors)
+4. Commit with: `"feat: add NextAuth with credentials + Google OAuth, register API"`

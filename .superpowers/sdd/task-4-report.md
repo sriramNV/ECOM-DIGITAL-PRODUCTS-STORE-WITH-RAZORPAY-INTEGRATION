@@ -1,20 +1,16 @@
-# Task 4 Report — docker-compose.yml update
+# Task 4 Report: Shared Utilities + Database + Storage Clients
 
-## Status: Done
+**Status:** ✅ Complete
 
-## Commits
-- `625a096` feat: add worker service to docker-compose.yml
+**Commits:**
+- `8bd8778` — feat: add db, storage, utils, and rate-limit utilities
 
-## Files Changed
-| File | Action |
-|------|--------|
-| `docker-compose.yml` | Modified: added worker service block after web service |
+**Files created:**
+- `apps/web/lib/db.ts` — Prisma client singleton
+- `apps/web/lib/storage.ts` — MinIO S3 client (uploadFile, getDownloadUrl)
+- `apps/web/lib/utils.ts` — cn(), formatCurrency, formatDate, generateOrderNumber, slugify
+- `apps/web/lib/rate-limit.ts` — Redis-based rate limiter
 
-## Build Result
-`docker compose config` validates successfully — worker service parsed with all environment variables and dependencies.
+**Dependencies installed:** `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `redis`
 
-## Concerns
-None. The worker service follows the same pattern as the existing web service.
-
-## Report File
-`.superpowers/sdd/task-4-report.md`
+**Concerns:** None. All files follow the exact spec from the task brief.

@@ -3,7 +3,8 @@ import { adminGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import { validateZipFile, validateFileExtension, uploadProductFile } from "@/lib/services/files";
 
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const guard = await adminGuard();
   if (guard) return guard;
 

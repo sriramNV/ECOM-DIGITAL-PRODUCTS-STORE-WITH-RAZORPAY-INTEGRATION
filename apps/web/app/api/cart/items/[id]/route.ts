@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { userGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await userGuard();
   if (user instanceof NextResponse) return user;
 
