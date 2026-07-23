@@ -10,23 +10,15 @@
 ├──────────────────────────────────────────────────┤
 │                   API Routes                      │
 │  39 endpoints under app/api/                      │
-│  Auth: public | session | adminGuard | HMAC       │
+│  Auth: public | session | adminGuard              │
 ├──────────────────────────────────────────────────┤
 │               Service Layer                       │
-│  checkout-service   │  pricing-service            │
-│  coupon-service     │  fulfillment-service        │
-│  email-service      │  queue (Bull jobs)          │
+│  payments (simulated)  │  orders                  │
+│  files (MinIO/S3)      │  rate-limit (Redis)      │
 ├──────────────────────────────────────────────────┤
-│              Repository Layer                     │
-│  product-repo  order-repo  cart-repo              │
-│  category-repo coupon-repo  cms-repo              │
-│  analytics-repo  dead-letter-repo                 │
-├──────────────────────────────────────────────────┤
-│        External Integrations / Infrastructure     │
-│  Prisma/PostgreSQL  │  Printify API               │
-│  Redis (cache/queue)│  Razorpay                   │
-│  MinIO (S3 storage) │  Nodemailer (SMTP)          │
-│  PostHog (analytics)│  Pino (logging)             │
+│        Infrastructure                             │
+│  Prisma/PostgreSQL  │  Redis (rate limit/cache)   │
+│  MinIO (S3 storage) │  NextAuth (JWT)             │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -34,109 +26,93 @@
 
 ### Checkout Flow
 ```
-Cart → Create Razorpay Order → Payment (Razorpay SDK) → Verify Signature → Create DB Order → Clear Cart → Email Confirmation → Submit to Printify
+Cart (Zustand) → POST /api/cart (sync to server) → POST /api/orders → createOrderFromCart() → Order (PAID) → Clear cart → Redirect to order page
 ```
 
-### Product Management
+### File Download Flow
 ```
-Admin Form → POST/PUT /api/products → productRepo → Prisma → PostgreSQL
-Storefront → GET /api/products → productRepo.list() → Prisma
+User clicks Download → POST /api/orders/[id]/download/[itemId] → rateLimit check (3/hr) → generateDownloadUrl() → MinIO signed URL → Redirect / open
 ```
 
-### Fulfillment Flow
+### Account Deletion Flow
 ```
-Admin marks order → submitOrder(orderId) → Printify API → status update → webhook → email notification
+User confirms delete → DELETE /api/account/delete → $transaction() → Delete downloads → Delete payments → Delete order history → Delete orders → Clear cart → Delete cart → Delete sessions → Delete account → Delete user
 ```
 
 ## Auth Architecture
 
-NextAuth v5 with JWT strategy. Credentials provider (email + bcrypt password).
+NextAuth v5 with JWT strategy. Credentials provider (email + bcrypt password) + optional Google OAuth.
 
 - **Session check**: `auth()` from `lib/auth.ts` in API routes and server components
 - **Admin guard**: `adminGuard()` returns 401/403 if not admin
-- **Middleware** (`proxy.ts`): rate limits API, guards admin/account routes, sets security headers
-- **Roles**: `ADMIN`, `CUSTOMER` (enum in Prisma)
+- **User guard**: `userGuard()` returns user or 401
+- **Middleware**: Guards `/account`, `/admin`, `/auth` routes; sets security headers
+- **Roles**: `ADMIN`, `CUSTOMER` (Prisma enum)
 
 ## Key Decisions
 
-### Why Server Components + Client Components?
-- **Server Components** for data-fetching pages (products list, account, CMS pages) — direct DB access, no API call overhead
-- **Client Components** for interactive features (cart, checkout, product detail with variant selection) — state management, real-time UI
+### Why Simulated Payments?
+The platform uses simulated payments for development and self-hosted deployment. `POST /api/orders` creates an order with `PAID` status directly — no real payment gateway needed. Rate limiting (5 orders/hr per user) prevents abuse. Razorpay integration code exists but is deprecated.
 
 ### Why Zustand for Cart?
-Cart state needs to persist across page navigations and survive React re-renders without server roundtrips. Zustand provides client-side cart with localStorage persistence, synced to the server on login/checkout.
+Cart state needs to persist across page navigations and survive React re-renders without server roundtrips. Zustand with `persist` middleware provides client-side cart backed by localStorage, synced to the server at checkout.
 
-### Why Separate Repositories?
-Each repository encapsulates all Prisma queries for one entity. This keeps API routes thin (parse input → call repo → return response) and makes data access testable independent of HTTP.
+### Why Server Components + Client Components?
+- **Server Components** for data-fetching pages (products, account, admin) — direct Prisma access, no API call overhead, fresh data every request
+- **Client Components** for interactive features (cart, checkout, theme toggle) — client-side state, event handlers, animations
 
-### Printify Integration Design
-The Printify client wraps the REST API with retry logic (429 rate limits), typed request/response interfaces, and separate modules for products, orders, catalog, uploads, and webhooks.
+### Why MinIO?
+MinIO provides an S3-compatible API for file storage. Works with the AWS SDK v3 for generating signed download URLs. Can be swapped for AWS S3, Backblaze B2, or Cloudflare R2 with zero code changes.
 
 ## Directory Structure
 
 ```
 apps/web/
 ├── app/
-│   ├── api/                     # Next.js API routes (file-based routing)
-│   │   ├── auth/                # Authentication endpoints
-│   │   ├── products/            # Product CRUD + listing
-│   │   ├── cart/                # Cart management
-│   │   ├── orders/              # Order queries
-│   │   ├── razorpay/            # Payment gateway
-│   │   ├── printify/            # Fulfillment webhooks
-│   │   ├── admin/               # Admin-only endpoints
-│   │   ├── analytics/           # Dashboard data
-│   │   ├── cms/                 # Content management
-│   │   ├── promotions/          # Coupons
-│   │   └── health/              # Health check
-│   ├── (storefront)/            # Public pages
-│   ├── (marketing)/             # Marketing pages (about, contact, FAQ)
-│   ├── (auth)/                  # Login/register
-│   └── admin/                   # Admin panel
+│   ├── (storefront)/        # Public pages (home, products)
+│   ├── account/             # User account pages
+│   ├── admin/               # Admin panel pages
+│   ├── api/                 # API routes (file-based)
+│   │   ├── account/         # User account management
+│   │   ├── admin/           # Admin CRUD endpoints
+│   │   ├── auth/            # Register + NextAuth
+│   │   ├── cart/            # Cart sync + merge
+│   │   ├── categories/      # Category listing
+│   │   ├── health/          # Health check
+│   │   ├── orders/          # Order + download
+│   │   └── products/        # Product listing
+│   ├── auth/                # Login/register pages
+│   ├── cart/                # Cart page
+│   └── checkout/            # Checkout page
 ├── components/
-│   ├── ui/                      # shadcn base components
-│   ├── storefront/              # Public UI components
-│   │   ├── layout/              # Navbar, footer, mobile menu
-│   │   ├── product/             # Cards, gallery, selector
-│   │   ├── cart/                # Cart drawer, item, summary
-│   │   ├── checkout/            # Checkout form, payment button
-│   │   ├── blocks/              # CMS content blocks
-│   │   └── shared/              # Breadcrumbs, pagination
-│   └── admin/                   # Admin UI components
-│       ├── layout/              # Shell, sidebar, topbar
-│       ├── dashboard/           # Stats, recent orders
-│       ├── products/            # Product form, table, variant manager
-│       ├── orders/              # Order detail, actions
-│       ├── crm/                 # Customer list, detail
-│       ├── cms/                 # Page editor, banners, collections
-│       ├── promotions/          # Coupons
-│       ├── analytics/           # Charts, funnel
-│       └── logs/                # Audit log viewer
+│   ├── ui/                  # shadcn base components
+│   ├── layout/              # Navbar, Footer
+│   ├── landing/             # Hero, CTA, featured grid
+│   ├── products/            # Product cards, detail, forms
+│   └── account/             # Download button, delete account
 ├── lib/
-│   ├── repositories/            # Data access layer
-│   ├── services/                # Business logic
-│   ├── printify/                # Printify API client
-│   ├── email/templates/         # Email HTML templates
-│   └── jobs/                    # Bull queue processors
-└── stores/                      # Zustand stores
+│   ├── services/            # Business logic
+│   │   ├── files/           # MinIO file operations
+│   │   ├── orders/          # Order queries + download URLs
+│   │   └── payments/        # Order creation (simulated)
+│   ├── auth.ts              # NextAuth configuration
+│   ├── db.ts                # Prisma client singleton
+│   ├── guard.ts             # adminGuard() + userGuard()
+│   ├── rate-limit.ts        # Redis-backed rate limiter
+│   ├── utils.ts             # Formatters, slugify, etc.
+│   └── button-variants.ts   # CVA button styles (shared)
+├── stores/
+│   ├── cart-store.ts        # Zustand cart with persist
+│   └── theme-store.ts       # Zustand theme with persist
+└── middleware.ts            # Auth protection + security headers
 ```
 
 ## State Management
 
 | State | Tool | Location |
 |-------|------|----------|
-| Server data (products, orders, etc.) | TanStack React Query | `useQuery` / `useMutation` hooks |
+| Server data (products, orders) | Server Components | Direct Prisma queries |
 | Client cart | Zustand + localStorage | `stores/cart-store.ts` |
-| Auth session | NextAuth `SessionProvider` | `providers/session-provider.tsx` |
-| UI state | React `useState` / `useReducer` | Component-local |
-
-## Security
-
-- **API routes**: `adminGuard` for admin endpoints, session check for user data
-- **Rate limiting**: Upstash Ratelimit via Redis (100 requests per 60s per IP)
-- **Webhook verification**: HMAC-SHA256 timing-safe comparison for Razorpay and Printify
-- **Payment verification**: HMAC signature check before order creation
-- **Amount tampering**: Order amount re-calculated server-side and compared with Razorpay order notes
-- **Health check**: IP-restricted to private network ranges
-- **Headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy via middleware
-- **Production**: CSP headers via Nginx (Razorpay allowed), HSTS, TLS 1.2/1.3
+| Theme preference | Zustand + localStorage | `stores/theme-store.ts` |
+| Auth session | NextAuth SessionProvider | `app/layout.tsx` |
+| UI state | React useState/useReducer | Component-local |

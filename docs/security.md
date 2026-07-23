@@ -1,154 +1,112 @@
-# POD Security Architecture
+# Security Architecture
 
 ## 1. Authentication
 
 **Framework:** NextAuth v5 (Auth.js) with JWT strategy.
 
-- **Credentials provider** (`apps/web/lib/auth.ts:1`): Email + password authentication using bcryptjs `compare()` for verification.
-- **JWT session strategy** (`auth.ts:60`): No database sessions. JWT carries `id`, `email`, `name`, and `role` — no sensitive data.
-- **Registration** (`apps/web/app/api/auth/register/route.ts:23`): Passwords hashed with bcryptjs `hash()` at cost factor 12 before storage.
-- **Session helper**: `auth()` returns the session in API routes; `SessionProvider` delivers it to the client.
-- **Role enum** (`prisma/schema.prisma:10`): `ADMIN` and `CUSTOMER` enforced at the database level via Prisma enum.
-
-Secrets: `AUTH_SECRET` lives in environment variables only, never in code.
+- **Credentials provider**: Email + password authentication using bcryptjs `compare()` for verification (cost factor 12).
+- **Google OAuth provider**: Optional Google sign-in.
+- **JWT strategy**: No database sessions. JWT carries `id`, `email`, `name`, and `role`.
+- **Registration**: Passwords hashed with bcrypt `hash()` at cost 12. Rate-limited: 5 requests per 5 minutes per IP.
+- **Password policy**: Minimum 8 characters, maximum 100 (enforced by Zod).
 
 ## 2. Authorization
 
-**Route Guard:**
-- `adminGuard()` (`apps/web/lib/admin-guard.ts:4`): Returns `401 Unauthorized` if no session, `403 Forbidden` if role is not `ADMIN`. Used on all admin API routes and admin page layouts.
+### Route Guards
+- `adminGuard()` — Returns `401` if no session, `403` if role is not `ADMIN`. Used on all admin API routes.
+- `userGuard()` — Returns `401` if no session, otherwise returns the user object.
 
-**Middleware:**
-- `proxy.ts:29-35`: Redirects `/admin/*` to `/login` if unauthenticated, redirects to `/` if not ADMIN. Same pattern for `/account/*` (auth required) and `/login`/`/register` (redirect to `/account` if already logged in).
+### Middleware (`middleware.ts`)
+- `/account/*` — Requires authentication; redirects to `/auth/login`
+- `/admin/*` — Requires admin role; redirects to `/auth/login` or `/`
+- `/auth/login`, `/auth/register` — Redirects authenticated users to `/account`
+- Sets security headers on every response
 
-**Data access scoping:**
-- Payment verification (`apps/web/app/api/razorpay/verify/route.ts:15`): Uses `session.user.id` from auth, not user-supplied IDs.
-- Checkout order creation uses authenticated `userId` throughout.
+### Data Access Scoping
+- Order queries filter by `userId` from the authenticated session, not user-supplied IDs
+- Download endpoints verify order ownership before generating URLs
+- Account deletion uses `session.user.id` — users cannot delete other accounts
 
-## 3. Payment Security
+## 3. Rate Limiting
 
-**Order Creation** (`apps/web/lib/services/checkout-service.ts:14`):
-- Amount calculated entirely server-side: subtotal from cart items + shipping + tax - discount.
-- No client-supplied price values accepted. Stock levels verified server-side before creation.
-- Razorpay order created with `notes` containing `userId` and `expectedAmount`.
+**Implementation** (`lib/rate-limit.ts`): Redis-based sliding window using `INCR` + `EXPIRE`.
 
-**Verification** (`checkout-service.ts:76`):
-- HMAC-SHA256 signature verification using `RAZORPAY_KEY_SECRET` over `${orderId}|${paymentId}`.
-- Amount tampering prevention (`checkout-service.ts:139`): After HMAC verification, the Razorpay order is fetched and its `notes.expectedAmount` is compared against the server-recalculated total. Mismatch throws `"Payment amount mismatch - possible tampering detected"`.
-- Duplicate payment prevention (`checkout-service.ts:104`): Checks for existing `razorpayPaymentId` before creating a new order.
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| Registration | 5 | 5 minutes |
+| Order creation | 5 | 1 hour |
+| File download | 3 | 1 hour |
+| Bulk download | 3 | 1 hour |
 
-**Webhook** (`apps/web/app/api/razorpay/webhooks/route.ts:15`):
-- HMAC-SHA256 verification using `RAZORPAY_WEBHOOK_SECRET` over the raw request body.
-- Idempotency via Redis (`redis.get("webhook:${eventId}")`). Processed events stored with 24h TTL.
-- Only processes `payment.captured` events. Order status transitions guarded by current state check.
+On Redis failure, rate limiting fails closed (requests are rejected) to prevent bypass.
 
-## 4. Webhook Verification
+## 4. Payment Security
 
-| Webhook | Verification Method | File |
-|---------|-------------------|------|
-| Razorpay | HMAC-SHA256, string comparison | `apps/web/app/api/razorpay/webhooks/route.ts:15` |
-| Printify | HMAC-SHA256, `crypto.timingSafeEqual` | `apps/web/app/api/printify/webhooks/route.ts:23-25` |
+The platform uses **simulated payments** — no real payment gateway. Orders are created with `PAID` status directly.
 
-Both use `crypto.createHmac("sha256", WEBHOOK_SECRET).update(rawBody).digest("hex")` for signature generation.
+Mitigations:
+- Rate limiting on order creation (5/hr) prevents abuse
+- Cart must be synced to server before order creation
+- Cart item quantities and prices are recalculated server-side from the database
+- Order amounts are computed from the database at order time, not accepted from the client
 
-Printify additionally validates signature length before calling `crypto.timingSafeEqual` to prevent timing attacks on HMAC comparison. The Razorpay webhook uses direct string comparison (acceptable because HMAC output is fixed-length and the comparison is done server-side with no user-controlled timing signal).
+## 5. HTTP Security
 
-Idempotency: Both webhooks use Redis key with `NX + EX 86400` to prevent duplicate processing.
-
-## 5. Rate Limiting
-
-**Implementation** (`apps/web/proxy.ts:4`):
-- Custom Redis-based sliding window using `INCR` + `EXPIRE`.
-- 100 requests per 60 seconds per IP.
-- IP extracted from `x-forwarded-for` header.
-- Fail-open: if Redis is unavailable, rate limiting is bypassed (returns `true`).
-
-**Scope:** Applied in middleware on all `/api/*` routes via NextAuth middleware wrapper.
-
-## 6. HTTP Security
-
-**Middleware** (`apps/web/proxy.ts:46-48`):
+**Middleware** (`middleware.ts`):
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 
-**Production Nginx** (`nginx/conf.d/security-headers.conf`):
-- `Content-Security-Policy`: Restrictive default-src `'self'`. Razorpay whitelisted: `checkout.razorpay.com` (scripts, frames) and `api.razorpay.com` (connect). `'unsafe-inline'` for styles, `'unsafe-eval'` for Next.js.
-- `Strict-Transport-Security`: `max-age=31536000; includeSubDomains`
-- Duplicates middleware headers at the Nginx layer as defense-in-depth.
-
-**TLS** (`nginx/conf.d/ssl-params.conf`):
-- Protocols: TLSv1.2 and TLSv1.3 only.
-- Strong cipher suite, OCSP stapling enabled.
-- Session tickets disabled.
-
-## 7. Data Protection
-
-**Passwords:**
-- Hashed with bcrypt at cost 12 (`register/route.ts:23`, `prisma/seed.ts:13`).
-- Never stored in plaintext. Database `password` field is nullable (OAuth users may not have one).
-
-**JWT Tokens:**
-- Contain only `id`, `email`, `name`, `role` — no passwords, payment info, or PII.
-
-**Environment Variables:**
-- All secrets (AUTH_SECRET, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET, PRINTIFY_API_TOKEN, PRINTIFY_WEBHOOK_SECRET, DATABASE_URL, SMTP credentials, MinIO keys) are environment variables only. No hardcoded secrets.
-- `.env.example` and `.env.production.example` document required variables with placeholder values.
-
-**SQL Injection:**
-- Prisma ORM generates parameterized queries. No raw SQL in the codebase.
-
-**Shipping Address Sanitization:**
-- `checkout-service.ts:144`: Internal fields like `couponCode` stripped before persisting.
-- `checkout-service.ts:145-147`: Undefined values filtered, only clean address data stored as JSON.
-
-## 8. Audit Logging
-
-**AuditLog Model** (`prisma/schema.prisma:316`):
+**Production**: Add additional headers at your reverse proxy:
 ```
-id        String   @id
-userId    String?
-action    String
-entity    String
-entityId  String?
-metadata  Json?
-ip        String?
-createdAt DateTime
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; ...
 ```
 
-**Usage:**
-- Fulfillment failures logged via `deadLetterRepo.add()` (`apps/web/lib/repositories/dead-letter-repo.ts:5`) with action `"fulfillment_failed"`, entity `"order"`, and error context.
-- User registration events logged with `userId` (`register/route.ts:34`).
-- Payment verification failures logged with error context (`verify/route.ts:37`).
-- Order creation logged with `orderId` and `orderNumber` (`checkout-service.ts:194`).
+## 6. Data Protection
 
-**Admin interface** (`apps/web/app/api/logs/audit/route.ts`):
-- Protected by `adminGuard()`.
-- Supports filtering by `action`, `entity`, `entityId`.
-- Paginated with max 100 results per page.
+**Passwords**: Hashed with bcrypt at cost 12. Never stored in plaintext.
 
-## 9. Dependency Security
+**JWT Tokens**: Contain only `id`, `email`, `name`, `role` — no passwords or PII.
 
-- **bcryptjs**: Pure JS bcrypt for password hashing (no native compilation needed).
-- **crypto**: Node.js built-in for HMAC, timing-safe comparisons.
-- **zod**: Input validation on all API routes (registration, payment verification, shipping address, audit log queries).
-- **Prisma**: Type-safe database access with parameterized queries.
+**Environment Variables**: All secrets (`AUTH_SECRET`, `DATABASE_URL`, `MINIO_SECRET_KEY`, `REDIS_PASSWORD`) are environment variables only. The docker-compose file requires them to be set explicitly (`${VAR:?must be set}` — no defaults for secrets).
 
-## Threat Model Summary
+**Download URLs**: Signed URLs generated by MinIO with expiration. Direct file access without a valid signed URL is denied.
+
+**SQL Injection**: Prisma ORM generates parameterized queries. No raw SQL in the codebase.
+
+## 7. Infrastructure Security
+
+**Docker**:
+- Container runs as non-root `nextjs` user (Dockerfile)
+- Internal service ports (Postgres, Redis) not exposed to host
+- MinIO API port (9000) is the only infrastructure port exposed
+- Redis requires password authentication
+- Health checks configured on all services
+
+**Network**:
+- Services communicate over an internal Docker network
+- Only the web service (port 3000) needs to be accessible from the internet
+
+## 8. Audit Trail
+
+**Download tracking**: Each file download is recorded in the `Download` table with userId, productId, orderId, fileVersion, IP, and timestamp.
+
+**Order status history**: Every status transition is recorded in `OrderStatusHistory` — immutable audit trail for all orders.
+
+## Threat Model
 
 | Threat | Mitigation |
 |--------|-----------|
-| Brute force login | bcrypt cost 12, rate limiting (100/60s) |
-| JWT tampering | JWT signed with AUTH_SECRET via NextAuth |
-| Payment amount tampering | Server-side amount recalculation + Razorpay notes comparison |
-| Replay payment ID | Duplicate payment check, webhook idempotency |
-| Webhook forgery | HMAC-SHA256 signature verification |
-| Timing attacks | crypto.timingSafeEqual on Printify webhooks |
-| XSS | CSP headers, React's built-in escaping |
+| Brute force login | bcrypt cost 12, rate limiting on registration |
+| Session hijacking | JWT signed with AUTH_SECRET |
+| Unauthorized download | Ownership check on order + rate limiting |
+| Mass account creation | Rate limiting on registration |
+| Account deletion | Requires auth + explicit confirmation |
+| Price manipulation | Server-side price recalculation from DB |
+| Replay download | No replay protection needed (signed URLs are one-time) |
+| XSS | React's built-in escaping, security headers |
 | Clickjacking | X-Frame-Options: DENY |
-| MIME sniffing | X-Content-Type-Options: nosniff |
-| Man-in-the-middle | HSTS, TLS 1.2/1.3 only |
 | SQL injection | Prisma parameterized queries |
-| Sensitive data exposure | No secrets in JWT, env-only secrets |
-| Coupon abuse | Server-side validation, per-user limits |
-| CSRF | NextAuth built-in CSRF protection, JWT-based sessions |
-| Admin privilege escalation | Role enum + adminGuard() on every admin route + middleware redirect |
+| Container escape | Non-root user, minimal image |
+| Secret exposure | Env-only secrets, no defaults in compose |
