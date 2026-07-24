@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+      return NextResponse.json({ error: "Validation failed" }, { status: 422 });
     }
 
     const hashedPassword = await hash(password, 12);
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 422 });
+      return NextResponse.json({ error: "Validation failed" }, { status: 422 });
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

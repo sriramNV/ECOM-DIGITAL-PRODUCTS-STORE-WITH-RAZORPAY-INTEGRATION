@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
 import { prisma } from "./db";
+import { rateLimit } from "./rate-limit";
 
 declare module "next-auth" {
   interface User { role?: string }
@@ -16,8 +17,8 @@ declare module "@auth/core/jwt" {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
-  trustHost: !!process.env.AUTH_TRUST_HOST,
+  session: { strategy: "jwt", maxAge: 86400 },
+  trustHost: process.env.AUTH_TRUST_HOST === "true",
   pages: { signIn: "/auth/login", newUser: "/auth/register" },
   providers: [
     Google,
@@ -28,6 +29,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        const ip = (credentials as any)?.ip || "unknown";
+        const { allowed } = await rateLimit(`login:${credentials.email}`, 5, 300);
+        if (!allowed) return null;
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
         });

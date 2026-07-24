@@ -1,6 +1,11 @@
+import { basename } from "path";
 import { uploadFile, getDownloadUrl } from "@/lib/storage";
 
 const ZIP_MAGIC_BYTES = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+
+export function sanitizeFilename(filename: string): string {
+  return basename(filename);
+}
 
 export function validateZipFile(buffer: Buffer): boolean {
   if (buffer.length < 4) return false;
@@ -24,7 +29,8 @@ export async function uploadProductFile(
   filename: string,
   buffer: Buffer
 ) {
-  const fileKey = generateFileKey(productId, version, filename);
+  const safeName = sanitizeFilename(filename);
+  const fileKey = generateFileKey(productId, version, safeName);
   await uploadFile(fileKey, buffer);
   return fileKey;
 }

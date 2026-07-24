@@ -18,7 +18,8 @@ export async function rateLimit(
   windowSeconds: number
 ): Promise<{ allowed: boolean; remaining: number }> {
   if (!redis) {
-    return { allowed: true, remaining: maxRequests };
+    console.error("Rate limit: Redis unavailable — failing closed");
+    return { allowed: false, remaining: 0 };
   }
 
   const now = Date.now();
@@ -33,7 +34,8 @@ export async function rateLimit(
       allowed: count <= maxRequests,
       remaining: Math.max(0, maxRequests - count),
     };
-  } catch {
-    return { allowed: true, remaining: maxRequests };
+  } catch (err) {
+    console.error("Rate limit: Redis error — failing closed", err);
+    return { allowed: false, remaining: 0 };
   }
 }

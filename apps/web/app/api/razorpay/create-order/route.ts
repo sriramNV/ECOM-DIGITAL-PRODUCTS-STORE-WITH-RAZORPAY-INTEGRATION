@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     const order = await createRazorpayOrder(user.id, couponCode);
     return NextResponse.json(order);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("Order creation failed:", error);
+    return NextResponse.json({ error: "Failed to create order" }, { status: 400 });
   }
 }

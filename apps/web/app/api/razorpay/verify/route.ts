@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { userGuard } from "@/lib/guard";
+import { prisma } from "@/lib/db";
 import { verifyPayment, createOrderFromPayment } from "@/lib/services/payments";
 
 export async function POST(req: Request) {
@@ -7,7 +8,7 @@ export async function POST(req: Request) {
   if (user instanceof NextResponse) return user;
 
   try {
-    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = await req.json();
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = await req.json();
 
     const isValid = await verifyPayment({
       razorpay_payment_id,
@@ -18,6 +19,17 @@ export async function POST(req: Request) {
     if (!isValid) {
       return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
     }
+
+    const cart = await prisma.cart.findUnique({
+      where: { userId: user.id },
+      include: { items: { include: { product: true } } },
+    });
+
+    const amount =
+      cart?.items.reduce(
+        (sum, item) => sum + Number(item.product.salePrice || item.product.price) * item.quantity,
+        0
+      ) || 0;
 
     const order = await createOrderFromPayment(
       user.id,

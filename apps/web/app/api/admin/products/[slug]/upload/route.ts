@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
-import { validateZipFile, validateFileExtension, uploadProductFile } from "@/lib/services/files";
+import { sanitizeFilename, validateZipFile, validateFileExtension, uploadProductFile } from "@/lib/services/files";
 
 export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
@@ -32,14 +32,15 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     return NextResponse.json({ error: "Invalid zip file (magic bytes check failed)" }, { status: 400 });
   }
 
+  const safeName = sanitizeFilename(file.name);
   const newVersion = product.fileVersion + 1;
-  const fileKey = await uploadProductFile(product.id, newVersion, file.name, buffer);
+  const fileKey = await uploadProductFile(product.id, newVersion, safeName, buffer);
 
   const updated = await prisma.product.update({
     where: { slug: params.slug },
     data: {
       fileKey,
-      fileName: file.name,
+      fileName: safeName,
       fileSize: file.size,
       fileVersion: newVersion,
     },

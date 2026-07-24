@@ -12,3 +12,11 @@ docker-compose*.yml
 .pnp.js
 coverage
 dist
+*.key
+*.pem
+*.p12
+.npmrc
+.git-credentials
+**/secrets/**
+**/credentials/**
+security-audit.md

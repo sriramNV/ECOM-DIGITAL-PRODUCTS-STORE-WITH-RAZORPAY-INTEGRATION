@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import { generateOrderNumber } from "@/lib/utils";
 import { createHmac } from "crypto";
 
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET!;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+if (!RAZORPAY_KEY_SECRET) throw new Error("RAZORPAY_KEY_SECRET is not configured");
 
 function createHmacSig(body: string) {
   return createHmac("sha256", RAZORPAY_KEY_SECRET).update(body).digest("hex");

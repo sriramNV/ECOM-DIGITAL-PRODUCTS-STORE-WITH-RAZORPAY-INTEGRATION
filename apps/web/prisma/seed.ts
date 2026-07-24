@@ -65,8 +65,6 @@ async function main() {
   }
 
   console.log("✅ Done");
-  console.log(`   Admin: admin@nexus.com / admin123`);
-  console.log(`   User:  user@example.com / user123`);
 }
 
 main()

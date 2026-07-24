@@ -1,53 +1,68 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 export async function POST(req: Request) {
-  const body = await req.text();
-  const signature = req.headers.get("x-razorpay-signature");
+  try {
+    const body = await req.text();
+    const signature = req.headers.get("x-razorpay-signature");
 
-  const expectedSig = createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
-    .update(body)
-    .digest("hex");
+    const expectedSig = createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
+      .update(body)
+      .digest("hex");
 
-  if (signature !== expectedSig) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-  }
+    const sigBuf = Buffer.from(signature || "");
+    const expectedBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
 
-  const event = JSON.parse(body);
+    const event = JSON.parse(body);
 
-  if (event.event === "payment.captured") {
-    const payment = event.payload.payment.entity;
+    if (event.event === "payment.captured") {
+      const payment = event.payload.payment.entity;
 
-    const existingPayment = await prisma.payment.findFirst({
-      where: { razorpayOrderId: payment.order_id },
-    });
-
-    if (existingPayment && existingPayment.status !== "COMPLETED") {
-      await prisma.payment.update({
-        where: { id: existingPayment.id },
-        data: {
-          razorpayPaymentId: payment.id,
-          status: "COMPLETED",
-          method: payment.method,
-        },
+      const existingPayment = await prisma.payment.findFirst({
+        where: { razorpayPaymentId: payment.id },
       });
 
-      const order = await prisma.order.findFirst({
-        where: { payments: { some: { id: existingPayment.id } } },
-      });
+      if (existingPayment) {
+        return NextResponse.json({ received: true });
+      }
 
-      if (order && order.status === "PENDING_PAYMENT") {
-        await prisma.order.update({
-          where: { id: order.id },
+      await prisma.$transaction(async (tx) => {
+        const order = await tx.order.findFirst({
+          where: { razorpayOrderId: payment.order_id },
+        });
+
+        if (!order) return;
+
+        await tx.payment.create({
           data: {
-            status: "PAID",
-            statusHistory: { create: { status: "PAID" } },
+            orderId: order.id,
+            razorpayOrderId: payment.order_id,
+            razorpayPaymentId: payment.id,
+            amount: payment.amount / 100,
+            status: "COMPLETED",
+            method: payment.method,
           },
         });
-      }
-    }
-  }
 
-  return NextResponse.json({ received: true });
+        if (order.status === "PENDING_PAYMENT") {
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: "PAID",
+              statusHistory: { create: { status: "PAID" } },
+            },
+          });
+        }
+      });
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error("Error in webhook:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

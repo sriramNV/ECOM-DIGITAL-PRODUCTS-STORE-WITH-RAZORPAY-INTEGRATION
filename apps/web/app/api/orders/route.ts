@@ -30,7 +30,8 @@ export async function POST() {
   try {
     const order = await createOrderFromCart(user.id);
     return NextResponse.json(order);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (error) {
+    console.error("Order creation failed:", error);
+    return NextResponse.json({ error: "Failed to create order" }, { status: 400 });
   }
 }

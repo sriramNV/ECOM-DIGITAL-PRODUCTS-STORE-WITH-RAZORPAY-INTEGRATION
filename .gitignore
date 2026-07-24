@@ -14,3 +14,4 @@ test-results/
 .next-dev.log
 playwright-report/
 ./pentest-report.md
+security-audit.md
