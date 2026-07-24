@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   const guard = await adminGuard();
   if (guard) return guard;
+
+  const { allowed } = await rateLimit(`admin-orders:${getClientIp(req)}`, 120, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const { searchParams } = new URL(req.url);
   const page = Number(searchParams.get("page")) || 1;

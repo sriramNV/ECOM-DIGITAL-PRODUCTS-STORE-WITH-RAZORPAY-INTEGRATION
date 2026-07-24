@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { listProducts, createProduct } from "@/lib/services/products";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   const guard = await adminGuard();
   if (guard) return guard;
+
+  const { allowed } = await rateLimit(`admin-products:${getClientIp(req)}`, 120, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const { searchParams } = new URL(req.url);
   const products = await listProducts({

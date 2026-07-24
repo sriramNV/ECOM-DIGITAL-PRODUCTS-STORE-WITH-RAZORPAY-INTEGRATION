@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   PENDING_PAYMENT: ["PAID", "CANCELLED"],
@@ -18,6 +19,11 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
   const params = await props.params;
   const guard = await adminGuard();
   if (guard) return guard;
+
+  const { allowed } = await rateLimit(`admin-order:${getClientIp(req)}`, 120, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: params.id },

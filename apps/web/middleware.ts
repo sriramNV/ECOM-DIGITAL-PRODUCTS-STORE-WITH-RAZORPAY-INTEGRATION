@@ -23,6 +23,16 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/account", req.url));
   }
 
+  if (pathname.startsWith("/api/") && !["GET", "HEAD"].includes(req.method)) {
+    const origin = req.headers.get("origin");
+    if (origin) {
+      const requestUrl = new URL(req.url);
+      if (origin !== requestUrl.origin) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+      }
+    }
+  }
+
   const response = NextResponse.next();
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");

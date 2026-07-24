@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { userGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 
 const cartItemSchema = z.object({
   productId: z.string().min(1),
@@ -14,6 +15,11 @@ const cartSyncSchema = z.object({
 export async function GET() {
   const user = await userGuard();
   if (user instanceof NextResponse) return user;
+
+  const { allowed } = await rateLimit(`user-cart:${user.id}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const cart = await prisma.cart.findUnique({
     where: { userId: user.id },

@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { adminGuard } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const guard = await adminGuard();
     if (guard) return guard;
+
+    const { allowed } = await rateLimit(`admin-categories:${getClientIp(req)}`, 120, 60);
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
 
     const categories = await prisma.category.findMany({
       orderBy: { order: "asc" },

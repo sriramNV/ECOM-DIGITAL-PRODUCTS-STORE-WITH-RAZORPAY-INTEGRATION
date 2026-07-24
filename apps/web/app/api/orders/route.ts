@@ -8,6 +8,11 @@ export async function GET(req: Request) {
   const user = await userGuard();
   if (user instanceof NextResponse) return user;
 
+  const { allowed } = await rateLimit(`user-orders:${user.id}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { searchParams } = new URL(req.url);
   const orders = await getUserOrders(
     user.id,
