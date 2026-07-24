@@ -4,7 +4,6 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
 import { prisma } from "./db";
-import { rateLimit } from "./rate-limit";
 
 declare module "next-auth" {
   interface User { role?: string }
@@ -30,6 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
         const ip = (credentials as any)?.ip || "unknown";
+        const { rateLimit } = await import("./rate-limit");
         const { allowed } = await rateLimit(`login:${credentials.email}`, 5, 300);
         if (!allowed) return null;
         const user = await prisma.user.findUnique({

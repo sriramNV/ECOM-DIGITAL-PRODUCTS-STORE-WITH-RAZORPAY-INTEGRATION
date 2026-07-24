@@ -2,11 +2,10 @@ import { prisma } from "@/lib/db";
 import { generateOrderNumber } from "@/lib/utils";
 import { createHmac } from "crypto";
 
-if (!process.env.RAZORPAY_KEY_SECRET) throw new Error("RAZORPAY_KEY_SECRET is not configured");
-const RAZORPAY_KEY_SECRET: string = process.env.RAZORPAY_KEY_SECRET;
-
 function createHmacSig(body: string) {
-  return createHmac("sha256", RAZORPAY_KEY_SECRET).update(body).digest("hex");
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) throw new Error("RAZORPAY_KEY_SECRET is not configured");
+  return createHmac("sha256", secret).update(body).digest("hex");
 }
 
 export async function createRazorpayOrder(userId: string, couponCode?: string) {
@@ -34,7 +33,7 @@ export async function createRazorpayOrder(userId: string, couponCode?: string) {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Basic ${Buffer.from(
-        `${process.env.RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`
+        `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
       ).toString("base64")}`,
     },
     body: JSON.stringify({
