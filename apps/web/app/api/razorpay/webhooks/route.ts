@@ -31,24 +31,27 @@ export async function POST(req: Request) {
       }
 
       await prisma.$transaction(async (tx) => {
-        const order = await tx.order.findFirst({
+        const paymentRec = await tx.payment.findFirst({
           where: { razorpayOrderId: payment.order_id },
         });
 
-        if (!order) return;
+        if (!paymentRec) return;
+        if (paymentRec.status === "COMPLETED") return;
 
-        await tx.payment.create({
+        await tx.payment.update({
+          where: { id: paymentRec.id },
           data: {
-            orderId: order.id,
-            razorpayOrderId: payment.order_id,
             razorpayPaymentId: payment.id,
-            amount: payment.amount / 100,
             status: "COMPLETED",
             method: payment.method,
           },
         });
 
-        if (order.status === "PENDING_PAYMENT") {
+        const order = await tx.order.findUnique({
+          where: { id: paymentRec.orderId },
+        });
+
+        if (order && order.status === "PENDING_PAYMENT") {
           await tx.order.update({
             where: { id: order.id },
             data: {

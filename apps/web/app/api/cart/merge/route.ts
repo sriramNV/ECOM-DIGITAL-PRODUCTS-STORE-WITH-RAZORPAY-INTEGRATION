@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     if (user instanceof NextResponse) return user;
 
     const body = await req.json();
-    const { items } = z.array(cartItemSchema).parse(body);
+    const items = z.array(cartItemSchema).parse(body.items);
 
     if (!items?.length) return NextResponse.json({ success: true });
 
