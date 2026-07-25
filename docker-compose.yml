@@ -30,6 +30,30 @@ services:
       timeout: 5s
       retries: 5
 
+  web-dev:
+    image: node:20-alpine
+    working_dir: /app
+    ports: ["3000:3000"]
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/.next
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital_products
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      UPLOAD_DIR: /app/apps/web/uploads
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-123}
+      AUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
+      NEXTAUTH_URL: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npm install -g pnpm@9.15.9 && pnpm install && pnpm --filter web exec prisma generate && pnpm --filter web dev"
+
   web:
     build:
       context: .

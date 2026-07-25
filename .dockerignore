@@ -20,3 +20,4 @@ dist
 **/secrets/**
 **/credentials/**
 security-audit.md
+.pnpm-store/

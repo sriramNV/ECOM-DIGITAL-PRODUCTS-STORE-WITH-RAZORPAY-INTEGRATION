@@ -16,3 +16,4 @@ playwright-report/
 ./pentest-report.md
 security-audit.md
 *.tsbuildinfo
+.pnpm-store/

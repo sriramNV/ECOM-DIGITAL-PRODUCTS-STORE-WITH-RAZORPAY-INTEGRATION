@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
+  const { data: session } = useSession();
   const { scrollY } = useScroll();
   const y = useTransform(scrollY, [0, 500], [0, 150]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
@@ -46,7 +48,11 @@ export function Hero() {
           className="flex justify-center gap-4"
         >
           <Link href="/products"><Button size="lg" className="animate-glow-pulse">Browse Products</Button></Link>
-          <Link href="/auth/register"><Button variant="outline" size="lg">Get Started</Button></Link>
+          {session ? (
+            <Link href="/account"><Button variant="outline" size="lg">My Account</Button></Link>
+          ) : (
+            <Link href="/auth/register"><Button variant="outline" size="lg">Get Started</Button></Link>
+          )}
         </motion.div>
       </motion.div>
     </section>
