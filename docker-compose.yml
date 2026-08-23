@@ -6,11 +6,11 @@ services:
     environment:
       POSTGRES_USER: pod
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must be set}
-      POSTGRES_DB: digital_products
+      POSTGRES_DB: digital_estore
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pod -d digital_products"]
+      test: ["CMD-SHELL", "pg_isready -U pod -d digital_estore"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,7 +40,7 @@ services:
       - /app/apps/web/.next
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital_products
+      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital_estore
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       UPLOAD_DIR: /app/apps/web/uploads
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-123}
@@ -64,7 +64,7 @@ services:
       - uploads:/data/uploads
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital_products
+      DATABASE_URL: postgresql://pod:${POSTGRES_PASSWORD}@postgres:5432/digital_estore
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       UPLOAD_DIR: /data/uploads
       AUTH_SECRET: ${AUTH_SECRET:?must be set}
