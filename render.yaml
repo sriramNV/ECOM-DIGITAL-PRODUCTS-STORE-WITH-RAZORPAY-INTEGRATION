@@ -7,9 +7,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: digital-estore
-          property: connectionString
+        value: postgresql://digital_estore_user:xIwuOVEBxXGqIiSJyUnLlRJ6fPvpEcZv@dpg-da591abbc2fs7388e4ng-a.oregon-postgres.render.com/digital_estore?sslmode=require
       - key: REDIS_URL
         fromService:
           type: redis
@@ -42,8 +40,3 @@ services:
     name: pod-redis
     plan: free
     ipAllowList: []
-
-databases:
-  - name: digital-estore
-    databaseName: digital_estore
-    user: pod
