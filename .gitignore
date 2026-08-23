@@ -3,7 +3,7 @@ node_modules/
 *.local
 .env
 .env.local
-!.env.example
+.env.example
 dist/
 .turbo/
 coverage/
@@ -17,3 +17,5 @@ playwright-report/
 security-audit.md
 *.tsbuildinfo
 .pnpm-store/
+.env*
+.env.*
